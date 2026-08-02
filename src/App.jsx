@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { sendMagicLink, signOut, watchSession } from "./lib/auth";
 import { supabase } from "./lib/supabaseClient";
 import {
-  fetchBpReadings, fetchBodyWeight, fetchBodyMeasurements, fetchWorkoutSessions,
+  fetchBpReadings, fetchBodyWeight, fetchBodyMeasurements, fetchWorkoutSessions, fetchWorkoutExercises,
 } from "./lib/data";
 
 const FORJA_URL = "https://forja-five.vercel.app";
@@ -18,6 +18,12 @@ const isoDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); re
 const fmtBR = (iso) => { const [, m, d] = iso.split("-"); return `${d}/${m}`; };
 const fmtBRFull = (iso) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
 const fmtHora = (ts) => new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+const fmtSecs = (n) => {
+  const v = Math.round(n);
+  if (v < 60) return `${v}s`;
+  const m = Math.floor(v / 60), s = v % 60;
+  return `${m}:${String(s).padStart(2, "0")}`;
+};
 
 const MEAS_FIELDS = [
   ["quadril", "Quadril"], ["cintura", "Cintura"], ["busto", "Busto"],
@@ -221,22 +227,29 @@ function Dashboard({ session }) {
   const [bw, setBw] = useState([]);
   const [meas, setMeas] = useState([]);
   const [workouts, setWorkouts] = useState([]);
+  const [exercises, setExercises] = useState([]);
 
   useEffect(() => {
     let alive = true;
     setLoading(true); setErr(null);
     const from = isoDaysAgo(period);
     const to = todayStr();
-    Promise.all([
+    Promise.allSettled([
       fetchBpReadings(from + "T00:00:00.000Z", to + "T23:59:59.999Z"),
       fetchBodyWeight(from, to),
       fetchBodyMeasurements(from, to),
       fetchWorkoutSessions(from, to),
-    ]).then(([bpR, bwR, measR, woR]) => {
+      fetchWorkoutExercises(from, to),
+    ]).then(([bpR, bwR, measR, woR, exR]) => {
       if (!alive) return;
-      setBp(bpR); setBw(bwR); setMeas(measR); setWorkouts(woR);
-    }).catch((e) => alive && setErr(e.message || "Erro ao carregar dados")
-    ).finally(() => alive && setLoading(false));
+      setBp(bpR.status === "fulfilled" ? bpR.value : []);
+      setBw(bwR.status === "fulfilled" ? bwR.value : []);
+      setMeas(measR.status === "fulfilled" ? measR.value : []);
+      setWorkouts(woR.status === "fulfilled" ? woR.value : []);
+      setExercises(exR.status === "fulfilled" ? exR.value : []);
+      const failed = [bpR, bwR, measR, woR, exR].find((r) => r.status === "rejected");
+      setErr(failed ? failed.reason?.message || "Erro ao carregar dados" : null);
+    }).finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, [period]);
 
@@ -259,7 +272,7 @@ function Dashboard({ session }) {
         )}
         {tab === "relatorios" && (
           <RelatoriosTab defaultFrom={isoDaysAgo(period)} defaultTo={todayStr()}
-            bp={bp} bw={bw} meas={meas} workouts={workouts} />
+            bp={bp} bw={bw} meas={meas} workouts={workouts} exercises={exercises} />
         )}
         {tab === "atalhos" && <AtalhosTab />}
       </div>
@@ -328,7 +341,7 @@ function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
 }
 
 /* ---------- Relatórios por especialista ---------- */
-function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts }) {
+function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercises }) {
   const [tipo, setTipo] = useState("fisio");
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
@@ -358,12 +371,48 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts }) {
       });
     } else lines.push("Sem registros de peso ou medidas no período.");
     lines.push("");
+
+    const ex = exercises.filter((e) => inRange(e.date));
+    const fmtExVal = (e) => (e.top_kg != null ? `${e.exercise_name} ${e.top_kg}kg` : e.top_duration_secs != null ? `${e.exercise_name} ${fmtSecs(e.top_duration_secs)}` : e.exercise_name);
+    lines.push("Exercícios do período:");
+    if (ex.length) {
+      const byDate = {};
+      ex.forEach((e) => { (byDate[e.date] = byDate[e.date] || []).push(e); });
+      Object.keys(byDate).sort().forEach((d) => {
+        const items = byDate[d];
+        lines.push(`${fmtBR(d)} (${items[0].ficha_name}): ${items.map(fmtExVal).join(" · ")}`);
+      });
+    } else lines.push("Sem detalhe de exercícios sincronizado no período.");
+    lines.push("");
+
+    const byExercise = {};
+    ex.forEach((e) => { (byExercise[e.exercise_name] = byExercise[e.exercise_name] || []).push(e); });
+    const progressions = Object.keys(byExercise).sort().map((name) => {
+      const arr = byExercise[name].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const first = arr[0], last = arr[arr.length - 1];
+      if (arr.length < 2) return null;
+      if (first.top_kg != null && last.top_kg != null) {
+        const delta = last.top_kg - first.top_kg;
+        return `${name}: ${first.top_kg}kg → ${last.top_kg}kg (${delta >= 0 ? "+" : ""}${delta}kg)`;
+      }
+      if (first.top_duration_secs != null && last.top_duration_secs != null) {
+        const delta = last.top_duration_secs - first.top_duration_secs;
+        return `${name}: ${fmtSecs(first.top_duration_secs)} → ${fmtSecs(last.top_duration_secs)} (${delta >= 0 ? "+" : ""}${fmtSecs(Math.abs(delta))})`;
+      }
+      return null;
+    }).filter(Boolean);
+    if (progressions.length) {
+      lines.push("Progressão de carga no período:");
+      progressions.forEach((p) => lines.push(p));
+    } else lines.push("Progressão de carga: ainda não há 2+ registros do mesmo exercício no período para comparar.");
+    lines.push("");
+
     const done = wo.filter((e) => e.done);
     const dayCount = Math.max(1, Math.round((new Date(to) - new Date(from)) / 864e5) + 1);
     const perWeek = (done.length / (dayCount / 7)).toFixed(1);
     lines.push(`Treino: ${done.length} sessões concluídas no período (${perWeek}/semana em média).`);
     return lines.join("\n");
-  }, [bw, meas, workouts, from, to, inRange]);
+  }, [bw, meas, workouts, exercises, from, to, inRange]);
 
   const cardioText = useMemo(() => {
     const r = bp.filter((e) => inRange(e.ts.slice(0, 10)));
