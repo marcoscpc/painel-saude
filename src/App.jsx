@@ -17,6 +17,12 @@ function isoOf(d) {
 const isoDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return isoOf(d); };
 const fmtBR = (iso) => { const [, m, d] = iso.split("-"); return `${d}/${m}`; };
 const fmtBRFull = (iso) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+const fmtHora = (ts) => new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+const MEAS_FIELDS = [
+  ["quadril", "Quadril"], ["cintura", "Cintura"], ["busto", "Busto"],
+  ["abaixo_busto", "Abaixo do busto"], ["braco_esq", "Braço esq."], ["braco_dir", "Braço dir."],
+];
 
 // Divide os últimos `days` dias em blocos de 7, do mais antigo pro mais recente —
 // é a granularidade usada no gráfico combinado pra deixar pressão, peso e treino comparáveis.
@@ -334,21 +340,28 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts }) {
     const w = bw.filter((e) => inRange(e.date));
     const m = meas.filter((e) => inRange(e.date));
     const wo = workouts.filter((e) => inRange(e.date));
-    const lines = [`Peso e frequência de treino — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
-    if (w.length) {
-      lines.push(`Peso: ${w[0].kg}kg em ${fmtBR(w[0].date)} → ${w[w.length - 1].kg}kg em ${fmtBR(w[w.length - 1].date)}`);
-    } else lines.push("Peso: sem registros no período.");
-    const lastMeas = m[m.length - 1];
-    if (lastMeas) {
-      const parts = [];
-      [["quadril", "Quadril"], ["cintura", "Cintura"], ["busto", "Busto"], ["abaixo_busto", "Abaixo do busto"], ["braco_esq", "Braço esq."], ["braco_dir", "Braço dir."]]
-        .forEach(([k, label]) => { if (lastMeas[k] != null) parts.push(`${label} ${lastMeas[k]}cm`); });
-      lines.push(`Medidas mais recentes (${fmtBR(lastMeas.date)}): ${parts.join(" · ") || "—"}`);
-    } else lines.push("Medidas: sem registros no período.");
+    const byDate = {};
+    w.forEach((e) => { byDate[e.date] = byDate[e.date] || {}; byDate[e.date].kg = e.kg; });
+    m.forEach((e) => {
+      byDate[e.date] = byDate[e.date] || {};
+      MEAS_FIELDS.forEach(([k]) => { if (e[k] != null) byDate[e.date][k] = e[k]; });
+    });
+    const dates = Object.keys(byDate).sort();
+    const lines = [`Peso e medidas corporais — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
+    if (dates.length) {
+      dates.forEach((d) => {
+        const r = byDate[d];
+        const parts = [];
+        if (r.kg != null) parts.push(`Peso: ${r.kg}kg`);
+        MEAS_FIELDS.forEach(([k, label]) => { if (r[k] != null) parts.push(`${label}: ${r[k]}cm`); });
+        lines.push(`${fmtBR(d)} — ${parts.join(" · ")}`);
+      });
+    } else lines.push("Sem registros de peso ou medidas no período.");
+    lines.push("");
     const done = wo.filter((e) => e.done);
     const dayCount = Math.max(1, Math.round((new Date(to) - new Date(from)) / 864e5) + 1);
     const perWeek = (done.length / (dayCount / 7)).toFixed(1);
-    lines.push(`Treino: ${done.length} sessões concluídas (${perWeek}/semana em média).`);
+    lines.push(`Treino: ${done.length} sessões concluídas no período (${perWeek}/semana em média).`);
     return lines.join("\n");
   }, [bw, meas, workouts, from, to, inRange]);
 
@@ -357,17 +370,24 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts }) {
     const w = bw.filter((e) => inRange(e.date));
     const lines = [`Pressão arterial e peso — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
     if (r.length) {
+      r.forEach((e) => {
+        const ctx = e.ctx && e.ctx.length ? ` (${e.ctx.join(", ")})` : "";
+        lines.push(`${fmtBR(e.ts.slice(0, 10))} ${fmtHora(e.ts)} — ${e.sys}/${e.dia} mmHg, pulso ${e.pul} — ${classify(e.sys, e.dia)}${ctx}`);
+      });
+      lines.push("");
       const avgSys = r.reduce((a, e) => a + e.sys, 0) / r.length;
       const avgDia = r.reduce((a, e) => a + e.dia, 0) / r.length;
       const cat = classify(avgSys, avgDia);
       const mrpa = avgSys >= 130 || avgDia >= 80;
-      lines.push(`Pressão: média ${avgSys.toFixed(0)}/${avgDia.toFixed(0)} mmHg em ${r.length} medições — classificação (consultório): ${cat}.`);
+      lines.push(`Média do período: ${avgSys.toFixed(0)}/${avgDia.toFixed(0)} mmHg em ${r.length} medições — ${cat}.`);
       lines.push(mrpa
         ? "Acima do limiar de referência domiciliar (130/80)."
         : "Dentro do limiar de referência domiciliar (130/80).");
-    } else lines.push("Pressão: sem registros no período.");
+    } else lines.push("Sem registros de pressão no período.");
+    lines.push("");
     if (w.length) {
-      lines.push(`Peso: ${w[0].kg}kg em ${fmtBR(w[0].date)} → ${w[w.length - 1].kg}kg em ${fmtBR(w[w.length - 1].date)}`);
+      lines.push("Peso:");
+      w.forEach((e) => lines.push(`${fmtBR(e.date)} — ${e.kg}kg`));
     } else lines.push("Peso: sem registros no período.");
     return lines.join("\n");
   }, [bp, bw, from, to, inRange]);
