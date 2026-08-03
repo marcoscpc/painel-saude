@@ -407,37 +407,10 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
     const w = bw.filter((e) => inRange(e.date));
     const m = meas.filter((e) => inRange(e.date));
     const wo = workouts.filter((e) => inRange(e.date));
-    const byDate = {};
-    w.forEach((e) => { byDate[e.date] = byDate[e.date] || {}; byDate[e.date].kg = e.kg; });
-    m.forEach((e) => {
-      byDate[e.date] = byDate[e.date] || {};
-      MEAS_FIELDS.forEach(([k]) => { if (e[k] != null) byDate[e.date][k] = e[k]; });
-    });
-    const dates = Object.keys(byDate).sort();
-    const lines = [`Peso e medidas corporais — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
-    if (dates.length) {
-      dates.forEach((d) => {
-        const r = byDate[d];
-        const parts = [];
-        if (r.kg != null) parts.push(`Peso: ${r.kg}kg`);
-        MEAS_FIELDS.forEach(([k, label]) => { if (r[k] != null) parts.push(`${label}: ${r[k]}cm`); });
-        lines.push(`${fmtBR(d)} — ${parts.join(" · ")}`);
-      });
-    } else lines.push("Sem registros de peso ou medidas no período.");
-    lines.push("");
-
     const ex = exercises.filter((e) => inRange(e.date));
-    const fmtExVal = (e) => (e.top_kg != null ? `${e.exercise_name} ${e.top_kg}kg` : e.top_duration_secs != null ? `${e.exercise_name} ${fmtSecs(e.top_duration_secs)}` : e.exercise_name);
-    lines.push("Exercícios do período:");
-    if (ex.length) {
-      const byDate = {};
-      ex.forEach((e) => { (byDate[e.date] = byDate[e.date] || []).push(e); });
-      Object.keys(byDate).sort().forEach((d) => {
-        const items = byDate[d];
-        lines.push(`${fmtBR(d)} (${items[0].ficha_name}): ${items.map(fmtExVal).join(" · ")}`);
-      });
-    } else lines.push("Sem detalhe de exercícios sincronizado no período.");
-    lines.push("");
+    const done = wo.filter((e) => e.done);
+    const dayCount = Math.max(1, Math.round((new Date(to) - new Date(from)) / 864e5) + 1);
+    const perWeek = (done.length / (dayCount / 7)).toFixed(1);
 
     const byExercise = {};
     ex.forEach((e) => { (byExercise[e.exercise_name] = byExercise[e.exercise_name] || []).push(e); });
@@ -455,16 +428,51 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
       }
       return null;
     }).filter(Boolean);
-    if (progressions.length) {
-      lines.push("Progressão de carga no período:");
-      progressions.forEach((p) => lines.push(p));
-    } else lines.push("Progressão de carga: ainda não há 2+ registros do mesmo exercício no período para comparar.");
+
+    const lines = [`Relatório de fisioterapia — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
+
+    lines.push("RESUMO");
+    lines.push(w.length
+      ? `Peso: ${w[0].kg}kg (${fmtBR(w[0].date)}) → ${w[w.length - 1].kg}kg (${fmtBR(w[w.length - 1].date)})`
+      : "Peso: sem registros no período.");
+    lines.push(`Treino: ${done.length} sessões concluídas (${perWeek}/semana em média).`);
     lines.push("");
 
-    const done = wo.filter((e) => e.done);
-    const dayCount = Math.max(1, Math.round((new Date(to) - new Date(from)) / 864e5) + 1);
-    const perWeek = (done.length / (dayCount / 7)).toFixed(1);
-    lines.push(`Treino: ${done.length} sessões concluídas no período (${perWeek}/semana em média).`);
+    lines.push("PROGRESSÃO DE CARGA");
+    if (progressions.length) progressions.forEach((p) => lines.push(p));
+    else lines.push("Ainda não há 2+ registros do mesmo exercício no período pra comparar.");
+    lines.push("");
+
+    lines.push("PESO E MEDIDAS POR DATA");
+    const byDate = {};
+    w.forEach((e) => { byDate[e.date] = byDate[e.date] || {}; byDate[e.date].kg = e.kg; });
+    m.forEach((e) => {
+      byDate[e.date] = byDate[e.date] || {};
+      MEAS_FIELDS.forEach(([k]) => { if (e[k] != null) byDate[e.date][k] = e[k]; });
+    });
+    const dates = Object.keys(byDate).sort();
+    if (dates.length) {
+      dates.forEach((d) => {
+        const r = byDate[d];
+        const parts = [];
+        if (r.kg != null) parts.push(`Peso: ${r.kg}kg`);
+        MEAS_FIELDS.forEach(([k, label]) => { if (r[k] != null) parts.push(`${label}: ${r[k]}cm`); });
+        lines.push(`${fmtBR(d)} — ${parts.join(" · ")}`);
+      });
+    } else lines.push("Sem registros de peso ou medidas no período.");
+    lines.push("");
+
+    lines.push("EXERCÍCIOS POR SESSÃO");
+    const fmtExVal = (e) => (e.top_kg != null ? `${e.exercise_name} ${e.top_kg}kg` : e.top_duration_secs != null ? `${e.exercise_name} ${fmtSecs(e.top_duration_secs)}` : e.exercise_name);
+    if (ex.length) {
+      const byDateEx = {};
+      ex.forEach((e) => { (byDateEx[e.date] = byDateEx[e.date] || []).push(e); });
+      Object.keys(byDateEx).sort().forEach((d) => {
+        const items = byDateEx[d];
+        lines.push(`${fmtBR(d)} (${items[0].ficha_name}): ${items.map(fmtExVal).join(" · ")}`);
+      });
+    } else lines.push("Sem detalhe de exercícios sincronizado no período.");
+
     return lines.join("\n");
   }, [bw, meas, workouts, exercises, from, to, inRange]);
 
