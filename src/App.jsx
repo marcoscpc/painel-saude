@@ -570,12 +570,6 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
     } else lines.push("Sem registros de pressão no período.");
     lines.push("");
 
-    lines.push("PICOS DO PERÍODO");
-    if (r.length) {
-      r.slice().sort((a, b) => lvl(b) - lvl(a) || (b.sys + b.dia) - (a.sys + a.dia)).slice(0, 3).forEach((e) => lines.push(fmtReading(e)));
-    } else lines.push("Sem registros no período.");
-    lines.push("");
-
     lines.push("MEDIÇÕES — MANHÃ");
     if (manha.length) manha.forEach((e) => lines.push(fmtReading(e)));
     else lines.push("Sem medições pela manhã no período.");
