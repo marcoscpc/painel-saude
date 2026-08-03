@@ -75,7 +75,7 @@ function weeklyWorkoutCount(rows, weeks) {
 
 // Várias séries (podem ter buracos) no mesmo eixo Y real, em vez de normalizadas —
 // só faz sentido quando as séries compartilham unidade (ex.: sistólica + diastólica, ambas mmHg).
-function multiSeriesRealPoints(seriesList, w, h, padX, padY) {
+function multiSeriesRealPoints(seriesList, w, h, padX, padTop, padBottom) {
   const allVals = seriesList.flatMap((s) => s.values.filter((v) => v != null && !Number.isNaN(v)));
   if (!allVals.length) return null;
   let lo = Math.min(...allVals), hi = Math.max(...allVals);
@@ -84,14 +84,36 @@ function multiSeriesRealPoints(seriesList, w, h, padX, padY) {
   lo -= pad; hi += pad;
   const n = seriesList[0].values.length - 1 || 1;
   const px = (i) => padX + (i / n) * (w - padX * 2);
-  const py = (v) => h - padY - ((v - lo) / (hi - lo)) * (h - padY * 2);
+  const py = (v) => h - padBottom - ((v - lo) / (hi - lo)) * (h - padTop - padBottom);
   return {
-    lo, hi,
+    lo, hi, mid: (lo + hi) / 2, px, py,
     series: seriesList.map((s) => ({
       ...s,
       pts: s.values.map((v, i) => (v == null || Number.isNaN(v) ? null : { x: px(i), y: py(v) })).filter(Boolean),
     })),
   };
+}
+
+// Índices de semana a rotular no eixo X: início, meio e fim do período (ou só início/fim se curto).
+function xAxisWeekIndexes(weeks) {
+  return weeks.length > 2 ? [0, Math.floor((weeks.length - 1) / 2), weeks.length - 1] : [0, weeks.length - 1];
+}
+function YGridLines({ chart, w, padX, decimals = 0, unit = "" }) {
+  return [chart.hi, chart.mid, chart.lo].map((v, i) => (
+    <g key={i}>
+      <line x1={padX} x2={w - padX} y1={chart.py(v)} y2={chart.py(v)} stroke="var(--line)" strokeDasharray="2 3" />
+      <text x={padX} y={chart.py(v) - 3} fontSize="9" fill="var(--muted)">{v.toFixed(decimals)}{unit}</text>
+    </g>
+  ));
+}
+function XAxisLabels({ weeks, chart, h }) {
+  const idxs = xAxisWeekIndexes(weeks);
+  return idxs.map((i) => (
+    <text key={i} x={chart.px(i)} y={h - 4} fontSize="9" fill="var(--muted)"
+      textAnchor={i === 0 ? "start" : i === weeks.length - 1 ? "end" : "middle"}>
+      {fmtBR(weeks[i].start)}
+    </text>
+  ));
 }
 const toPolyline = (pts) => pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 const lastValue = (values) => { for (let i = values.length - 1; i >= 0; i--) if (values[i] != null) return values[i]; return null; };
@@ -314,27 +336,27 @@ function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
       {!loading && !err && !anyData && (
         <div className="card"><div className="empty">Sem dados sincronizados neste período ainda.</div></div>
       )}
-      {!loading && !err && anyBp && <BpChart sys={sysSeries} dia={diaSeries} />}
-      {!loading && !err && anyKg && <WeightChart kg={kgSeries} />}
-      {!loading && !err && anyWo && <WorkoutChart counts={woSeries} />}
+      {!loading && !err && anyBp && <BpChart sys={sysSeries} dia={diaSeries} weeks={weeks} />}
+      {!loading && !err && anyKg && <WeightChart kg={kgSeries} weeks={weeks} />}
+      {!loading && !err && anyWo && <WorkoutChart counts={woSeries} weeks={weeks} />}
     </>
   );
 }
 
-function BpChart({ sys, dia }) {
-  const W = 600, H = 160, PADX = 10, PADY = 16;
+function BpChart({ sys, dia, weeks }) {
+  const W = 600, H = 190, PADX = 30, PADTOP = 14, PADBOTTOM = 30;
   const chart = multiSeriesRealPoints(
     [{ key: "sys", label: "Sistólica", color: "#E06A5B", values: sys },
      { key: "dia", label: "Diastólica", color: "#F2A93B", values: dia }],
-    W, H, PADX, PADY
+    W, H, PADX, PADTOP, PADBOTTOM
   );
   if (!chart) return null;
   return (
     <div className="card">
       <h2 className="sec">Pressão arterial — média semanal (mmHg)</h2>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 160, display: "block" }}>
-        <text x={PADX} y="10" fontSize="9" fill="var(--muted)">{chart.hi.toFixed(0)}</text>
-        <text x={PADX} y={H - 2} fontSize="9" fill="var(--muted)">{chart.lo.toFixed(0)}</text>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 190, display: "block" }}>
+        <YGridLines chart={chart} w={W} padX={PADX} />
+        <XAxisLabels weeks={weeks} chart={chart} h={H} />
         {chart.series.map((s) => (
           <polyline key={s.key} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" points={toPolyline(s.pts)} />
         ))}
@@ -353,18 +375,18 @@ function BpChart({ sys, dia }) {
   );
 }
 
-function WeightChart({ kg }) {
-  const W = 600, H = 140, PADX = 10, PADY = 16;
-  const chart = multiSeriesRealPoints([{ key: "kg", color: "#4FA3E0", values: kg }], W, H, PADX, PADY);
+function WeightChart({ kg, weeks }) {
+  const W = 600, H = 170, PADX = 34, PADTOP = 14, PADBOTTOM = 30;
+  const chart = multiSeriesRealPoints([{ key: "kg", color: "#4FA3E0", values: kg }], W, H, PADX, PADTOP, PADBOTTOM);
   if (!chart) return null;
   const s = chart.series[0];
   const last = lastValue(kg);
   return (
     <div className="card">
       <h2 className="sec">Peso corporal — média semanal (kg)</h2>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 140, display: "block" }}>
-        <text x={PADX} y="10" fontSize="9" fill="var(--muted)">{chart.hi.toFixed(1)}</text>
-        <text x={PADX} y={H - 2} fontSize="9" fill="var(--muted)">{chart.lo.toFixed(1)}</text>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 170, display: "block" }}>
+        <YGridLines chart={chart} w={W} padX={PADX} decimals={1} />
+        <XAxisLabels weeks={weeks} chart={chart} h={H} />
         <polyline fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" points={toPolyline(s.pts)} />
         {s.pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="2.3" fill={s.color} />)}
       </svg>
@@ -373,21 +395,34 @@ function WeightChart({ kg }) {
   );
 }
 
-function WorkoutChart({ counts }) {
-  const W = 600, H = 90, PAD = 10;
+function WorkoutChart({ counts, weeks }) {
+  const W = 600, H = 120, PADX = 24, PADTOP = 6, PADBOTTOM = 24;
   const max = Math.max(1, ...counts.map((v) => v || 0));
   const n = counts.length;
-  const barW = (W - PAD * 2) / n;
+  const barAreaW = W - PADX * 2;
+  const barW = barAreaW / n;
+  const chartH = H - PADTOP - PADBOTTOM;
+  const py = (v) => H - PADBOTTOM - (v / max) * chartH;
   const last = counts.length ? counts[counts.length - 1] : 0;
+  const idxs = xAxisWeekIndexes(weeks);
   return (
     <div className="card">
       <h2 className="sec">Frequência de treino — sessões concluídas por semana</h2>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 70, display: "block" }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, display: "block" }}>
+        <line x1={PADX} x2={W - PADX} y1={py(0)} y2={py(0)} stroke="var(--line)" />
+        <text x={PADX} y={py(max) - 3} fontSize="9" fill="var(--muted)">{max}x</text>
+        <text x={PADX} y={py(0) - 3} fontSize="9" fill="var(--muted)">0</text>
         {counts.map((c, i) => {
           const v = c || 0;
-          const barH = (v / max) * (H - PAD * 2);
-          return <rect key={i} x={PAD + i * barW + 1} y={H - PAD - barH} width={Math.max(1, barW - 2)} height={Math.max(1, barH)} fill="#46B98A" rx="2" />;
+          const barH = py(0) - py(v);
+          return <rect key={i} x={PADX + i * barW + 1} y={py(v)} width={Math.max(1, barW - 2)} height={Math.max(1, barH)} fill="#46B98A" rx="2" />;
         })}
+        {idxs.map((i) => (
+          <text key={i} x={PADX + i * barW + barW / 2} y={H - 4} fontSize="9" fill="var(--muted)"
+            textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>
+            {fmtBR(weeks[i].start)}
+          </text>
+        ))}
       </svg>
       <p className="small muted" style={{ marginTop: 8 }}>Última semana: {last}x · máximo no período: {max}x</p>
     </div>
