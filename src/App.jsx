@@ -73,18 +73,25 @@ function weeklyWorkoutCount(rows, weeks) {
   return weeks.map((w) => rows.filter((r) => inWeek(r.date, w) && r.done).length);
 }
 
-// Normaliza uma série (pode ter buracos) no próprio min/máx, pra sobrepor no mesmo
-// gráfico séries com unidades diferentes (mmHg, kg, nº de treinos) — o objetivo é
-// comparar tendência ao longo do tempo, não valor absoluto entre séries.
-function seriesPoints(values, w, h, pad) {
-  const idx = values.map((v, i) => ({ i, v })).filter((p) => p.v != null && !Number.isNaN(p.v));
-  if (idx.length < 2) return null;
-  const lo = Math.min(...idx.map((p) => p.v)), hi = Math.max(...idx.map((p) => p.v));
-  const range = hi - lo || 1;
-  const n = values.length - 1 || 1;
-  const px = (i) => pad + (i / n) * (w - pad * 2);
-  const py = (v) => h - pad - ((v - lo) / range) * (h - pad * 2);
-  return idx.map((p) => ({ x: px(p.i), y: py(p.v) }));
+// Várias séries (podem ter buracos) no mesmo eixo Y real, em vez de normalizadas —
+// só faz sentido quando as séries compartilham unidade (ex.: sistólica + diastólica, ambas mmHg).
+function multiSeriesRealPoints(seriesList, w, h, padX, padY) {
+  const allVals = seriesList.flatMap((s) => s.values.filter((v) => v != null && !Number.isNaN(v)));
+  if (!allVals.length) return null;
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.12;
+  lo -= pad; hi += pad;
+  const n = seriesList[0].values.length - 1 || 1;
+  const px = (i) => padX + (i / n) * (w - padX * 2);
+  const py = (v) => h - padY - ((v - lo) / (hi - lo)) * (h - padY * 2);
+  return {
+    lo, hi,
+    series: seriesList.map((s) => ({
+      ...s,
+      pts: s.values.map((v, i) => (v == null || Number.isNaN(v) ? null : { x: px(i), y: py(v) })).filter(Boolean),
+    })),
+  };
 }
 const toPolyline = (pts) => pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
 const lastValue = (values) => { for (let i = values.length - 1; i >= 0; i--) if (values[i] != null) return values[i]; return null; };
@@ -280,7 +287,7 @@ function Dashboard({ session }) {
   );
 }
 
-/* ---------- Painel: gráfico combinado ---------- */
+/* ---------- Painel: um gráfico por métrica, todos na mesma linha do tempo ---------- */
 function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
   const weeks = useMemo(() => buildWeeks(period), [period]);
   const sysSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.sys), [bp, weeks]);
@@ -288,15 +295,10 @@ function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
   const kgSeries = useMemo(() => weeklyAvg(bw, "kg", weeks), [bw, weeks]);
   const woSeries = useMemo(() => weeklyWorkoutCount(workouts, weeks), [workouts, weeks]);
 
-  const W = 600, H = 220, PAD = 10;
-  const lines = [
-    { key: "sys", label: "Sistólica", color: "#E06A5B", values: sysSeries, unit: "mmHg" },
-    { key: "dia", label: "Diastólica", color: "#F2A93B", values: diaSeries, unit: "mmHg" },
-    { key: "kg", label: "Peso", color: "#4FA3E0", values: kgSeries, unit: "kg" },
-    { key: "wo", label: "Treinos/semana", color: "#46B98A", values: woSeries, unit: "x" },
-  ].map((l) => ({ ...l, pts: seriesPoints(l.values, W, H, PAD), last: lastValue(l.values) }));
-
-  const anyData = lines.some((l) => l.pts);
+  const anyBp = sysSeries.some((v) => v != null);
+  const anyKg = kgSeries.some((v) => v != null);
+  const anyWo = woSeries.some((v) => v);
+  const anyData = anyBp || anyKg || anyWo;
 
   return (
     <>
@@ -307,36 +309,88 @@ function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
           </button>
         ))}
       </div>
-      <div className="card">
-        <h2 className="sec">Pressão, peso e treino — médias semanais</h2>
-        {loading && <div className="empty">Carregando…</div>}
-        {!loading && err && <div className="empty">Não foi possível carregar: {err}</div>}
-        {!loading && !err && !anyData && (
-          <div className="empty">Sem dados sincronizados neste período ainda.</div>
-        )}
-        {!loading && !err && anyData && (
-          <>
-            <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 220, display: "block" }}>
-              {lines.map((l) => l.pts && (
-                <polyline key={l.key} fill="none" stroke={l.color} strokeWidth="2" strokeLinejoin="round"
-                  points={toPolyline(l.pts)} />
-              ))}
-            </svg>
-            <div className="legend">
-              {lines.map((l) => (
-                <span key={l.key}>
-                  <i className="dot" style={{ background: l.color }} />
-                  {l.label}{l.last != null ? `: ${l.last.toFixed(1)}${l.unit === "x" ? "" : l.unit === "mmHg" ? "" : l.unit}` : ""}
-                </span>
-              ))}
-            </div>
-            <p className="small muted" style={{ marginTop: 12 }}>
-              Cada linha usa sua própria escala (a comparação é de tendência, não de valor absoluto entre séries).
-            </p>
-          </>
-        )}
-      </div>
+      {loading && <div className="card"><div className="empty">Carregando…</div></div>}
+      {!loading && err && <div className="card"><div className="empty">Não foi possível carregar: {err}</div></div>}
+      {!loading && !err && !anyData && (
+        <div className="card"><div className="empty">Sem dados sincronizados neste período ainda.</div></div>
+      )}
+      {!loading && !err && anyBp && <BpChart sys={sysSeries} dia={diaSeries} />}
+      {!loading && !err && anyKg && <WeightChart kg={kgSeries} />}
+      {!loading && !err && anyWo && <WorkoutChart counts={woSeries} />}
     </>
+  );
+}
+
+function BpChart({ sys, dia }) {
+  const W = 600, H = 160, PADX = 10, PADY = 16;
+  const chart = multiSeriesRealPoints(
+    [{ key: "sys", label: "Sistólica", color: "#E06A5B", values: sys },
+     { key: "dia", label: "Diastólica", color: "#F2A93B", values: dia }],
+    W, H, PADX, PADY
+  );
+  if (!chart) return null;
+  return (
+    <div className="card">
+      <h2 className="sec">Pressão arterial — média semanal (mmHg)</h2>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 160, display: "block" }}>
+        <text x={PADX} y="10" fontSize="9" fill="var(--muted)">{chart.hi.toFixed(0)}</text>
+        <text x={PADX} y={H - 2} fontSize="9" fill="var(--muted)">{chart.lo.toFixed(0)}</text>
+        {chart.series.map((s) => (
+          <polyline key={s.key} fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" points={toPolyline(s.pts)} />
+        ))}
+      </svg>
+      <div className="legend">
+        {chart.series.map((s) => {
+          const last = lastValue(s.values);
+          return (
+            <span key={s.key}><i className="dot" style={{ background: s.color }} />
+              {s.label}{last != null ? `: ${last.toFixed(0)} mmHg` : ""}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function WeightChart({ kg }) {
+  const W = 600, H = 140, PADX = 10, PADY = 16;
+  const chart = multiSeriesRealPoints([{ key: "kg", color: "#4FA3E0", values: kg }], W, H, PADX, PADY);
+  if (!chart) return null;
+  const s = chart.series[0];
+  const last = lastValue(kg);
+  return (
+    <div className="card">
+      <h2 className="sec">Peso corporal — média semanal (kg)</h2>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 140, display: "block" }}>
+        <text x={PADX} y="10" fontSize="9" fill="var(--muted)">{chart.hi.toFixed(1)}</text>
+        <text x={PADX} y={H - 2} fontSize="9" fill="var(--muted)">{chart.lo.toFixed(1)}</text>
+        <polyline fill="none" stroke={s.color} strokeWidth="2" strokeLinejoin="round" points={toPolyline(s.pts)} />
+        {s.pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="2.3" fill={s.color} />)}
+      </svg>
+      {last != null && <p className="small muted" style={{ marginTop: 8 }}>Último: {last.toFixed(1)}kg</p>}
+    </div>
+  );
+}
+
+function WorkoutChart({ counts }) {
+  const W = 600, H = 90, PAD = 10;
+  const max = Math.max(1, ...counts.map((v) => v || 0));
+  const n = counts.length;
+  const barW = (W - PAD * 2) / n;
+  const last = counts.length ? counts[counts.length - 1] : 0;
+  return (
+    <div className="card">
+      <h2 className="sec">Frequência de treino — sessões concluídas por semana</h2>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 70, display: "block" }}>
+        {counts.map((c, i) => {
+          const v = c || 0;
+          const barH = (v / max) * (H - PAD * 2);
+          return <rect key={i} x={PAD + i * barW + 1} y={H - PAD - barH} width={Math.max(1, barW - 2)} height={Math.max(1, barH)} fill="#46B98A" rx="2" />;
+        })}
+      </svg>
+      <p className="small muted" style={{ marginTop: 8 }}>Última semana: {last}x · máximo no período: {max}x</p>
+    </div>
   );
 }
 
