@@ -52,7 +52,7 @@ export async function fetchWorkoutSessions(fromDate, toDate) {
 export async function fetchWorkoutExercises(fromDate, toDate) {
   const { data, error } = await supabase
     .from("workout_exercises")
-    .select("date,ficha_name,exercise_name,top_kg,top_duration_secs,sets_count")
+    .select("date,ficha_name,exercise_name,top_kg,top_duration_secs,sets_count,notes")
     .gte("date", fromDate)
     .lte("date", toDate)
     .order("date");

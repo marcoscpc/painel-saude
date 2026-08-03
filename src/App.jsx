@@ -14,6 +14,8 @@ function isoOf(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 const isoDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return isoOf(d); };
+const toLocalDate = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
+const daysBetween = (fromIso, toIso) => Math.round((toLocalDate(toIso) - toLocalDate(fromIso)) / 864e5);
 const fmtBR = (iso) => { const [, m, d] = iso.split("-"); return `${d}/${m}`; };
 const fmtBRFull = (iso) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
 const fmtHora = (ts) => new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -446,8 +448,10 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
 
     const byExercise = {};
     ex.forEach((e) => { (byExercise[e.exercise_name] = byExercise[e.exercise_name] || []).push(e); });
+    Object.keys(byExercise).forEach((name) => byExercise[name].sort((a, b) => (a.date < b.date ? -1 : 1)));
+
     const progressions = Object.keys(byExercise).sort().map((name) => {
-      const arr = byExercise[name].sort((a, b) => (a.date < b.date ? -1 : 1));
+      const arr = byExercise[name];
       const first = arr[0], last = arr[arr.length - 1];
       if (arr.length < 2) return null;
       if (first.top_kg != null && last.top_kg != null) {
@@ -461,6 +465,23 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
       return null;
     }).filter(Boolean);
 
+    // Mesma regra do "Fique de olho" do Forja: platô = mesma carga nas últimas 3-5 sessões;
+    // parado = sem registro há 14+ dias (contado até o fim do período do relatório).
+    const attentionPoints = [];
+    Object.keys(byExercise).sort().forEach((name) => {
+      const desc = byExercise[name].slice().reverse();
+      const key = (e) => (e.top_kg != null ? e.top_kg : e.top_duration_secs);
+      const lastN = desc.slice(0, 5);
+      if (lastN.length >= 3 && lastN.every((x) => key(x) === key(lastN[0]))) {
+        const val = lastN[0].top_kg != null ? `${lastN[0].top_kg}kg` : fmtSecs(lastN[0].top_duration_secs);
+        attentionPoints.push(`${name}: mesma carga (${val}) nas últimas ${lastN.length} sessões.`);
+      }
+      const gap = daysBetween(desc[0].date, to);
+      if (gap >= 14) attentionPoints.push(`${name}: sem registro há ${gap} dias (última em ${fmtBR(desc[0].date)}).`);
+    });
+
+    const withNotes = ex.filter((e) => e.notes).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+
     const lines = [`Relatório de fisioterapia — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
 
     lines.push("RESUMO");
@@ -470,9 +491,19 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
     lines.push(`Treino: ${done.length} sessões concluídas (${perWeek}/semana em média).`);
     lines.push("");
 
+    lines.push("PONTOS DE ATENÇÃO");
+    if (attentionPoints.length) attentionPoints.forEach((p) => lines.push(p));
+    else lines.push("Nada chamando atenção nesse período.");
+    lines.push("");
+
     lines.push("PROGRESSÃO DE CARGA");
     if (progressions.length) progressions.forEach((p) => lines.push(p));
     else lines.push("Ainda não há 2+ registros do mesmo exercício no período pra comparar.");
+    lines.push("");
+
+    lines.push("OBSERVAÇÕES REGISTRADAS");
+    if (withNotes.length) withNotes.forEach((e) => lines.push(`${fmtBR(e.date)} — ${e.exercise_name}: ${e.notes}`));
+    else lines.push("Nenhuma observação anotada nas séries do período.");
     lines.push("");
 
     lines.push("PESO E MEDIDAS POR DATA");
