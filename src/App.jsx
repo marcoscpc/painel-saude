@@ -511,27 +511,54 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
   const cardioText = useMemo(() => {
     const r = bp.filter((e) => inRange(e.ts.slice(0, 10)));
     const w = bw.filter((e) => inRange(e.date));
-    const lines = [`Pressão arterial e peso — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
+    // Separação manhã/noite segue a mesma lógica MRPA já usada no registro-pa (hora < 12 = manhã).
+    const manha = r.filter((e) => new Date(e.ts).getHours() < 12);
+    const noite = r.filter((e) => new Date(e.ts).getHours() >= 12);
+    const lvl = (e) => Math.max(cSys(e.sys), cDia(e.dia));
+    const avgOf = (arr, key) => arr.reduce((a, e) => a + e[key], 0) / arr.length;
+    const fmtPeriodAvg = (arr) => (arr.length ? `${avgOf(arr, "sys").toFixed(0)}/${avgOf(arr, "dia").toFixed(0)} mmHg (${arr.length})` : "sem medições");
+    const fmtReading = (e) => {
+      const ctx = e.ctx && e.ctx.length ? ` (${e.ctx.join(", ")})` : "";
+      return `${fmtBR(e.ts.slice(0, 10))} ${fmtHora(e.ts)} — ${e.sys}/${e.dia} mmHg, pulso ${e.pul} — ${classify(e.sys, e.dia)}${ctx}`;
+    };
+
+    const lines = [`Relatório de cardiologia — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
+
+    lines.push("RESUMO");
     if (r.length) {
-      r.forEach((e) => {
-        const ctx = e.ctx && e.ctx.length ? ` (${e.ctx.join(", ")})` : "";
-        lines.push(`${fmtBR(e.ts.slice(0, 10))} ${fmtHora(e.ts)} — ${e.sys}/${e.dia} mmHg, pulso ${e.pul} — ${classify(e.sys, e.dia)}${ctx}`);
-      });
-      lines.push("");
-      const avgSys = r.reduce((a, e) => a + e.sys, 0) / r.length;
-      const avgDia = r.reduce((a, e) => a + e.dia, 0) / r.length;
-      const cat = classify(avgSys, avgDia);
-      const mrpa = avgSys >= 130 || avgDia >= 80;
-      lines.push(`Média do período: ${avgSys.toFixed(0)}/${avgDia.toFixed(0)} mmHg em ${r.length} medições — ${cat}.`);
-      lines.push(mrpa
+      lines.push(`Média geral: ${fmtPeriodAvg(r)} — ${classify(avgOf(r, "sys"), avgOf(r, "dia"))}.`);
+      lines.push(avgOf(r, "sys") >= 130 || avgOf(r, "dia") >= 80
         ? "Acima do limiar de referência domiciliar (130/80)."
         : "Dentro do limiar de referência domiciliar (130/80).");
+      lines.push(`Manhã: ${fmtPeriodAvg(manha)} · Noite: ${fmtPeriodAvg(noite)}`);
+      const severe = r.filter((e) => lvl(e) >= 3);
+      if (severe.length) {
+        const worst = severe.slice().sort((a, b) => lvl(b) - lvl(a) || (b.sys + b.dia) - (a.sys + a.dia))[0];
+        lines.push(`Atenção: ${severe.length} medição(ões) em HAS estágio 2 ou 3 no período — mais grave em ${fmtBR(worst.ts.slice(0, 10))} ${fmtHora(worst.ts)} (${worst.sys}/${worst.dia} mmHg).`);
+      }
     } else lines.push("Sem registros de pressão no período.");
     lines.push("");
-    if (w.length) {
-      lines.push("Peso:");
-      w.forEach((e) => lines.push(`${fmtBR(e.date)} — ${e.kg}kg`));
-    } else lines.push("Peso: sem registros no período.");
+
+    lines.push("PICOS DO PERÍODO");
+    if (r.length) {
+      r.slice().sort((a, b) => lvl(b) - lvl(a) || (b.sys + b.dia) - (a.sys + a.dia)).slice(0, 3).forEach((e) => lines.push(fmtReading(e)));
+    } else lines.push("Sem registros no período.");
+    lines.push("");
+
+    lines.push("MEDIÇÕES — MANHÃ");
+    if (manha.length) manha.forEach((e) => lines.push(fmtReading(e)));
+    else lines.push("Sem medições pela manhã no período.");
+    lines.push("");
+
+    lines.push("MEDIÇÕES — NOITE");
+    if (noite.length) noite.forEach((e) => lines.push(fmtReading(e)));
+    else lines.push("Sem medições à noite no período.");
+    lines.push("");
+
+    lines.push("PESO");
+    if (w.length) w.forEach((e) => lines.push(`${fmtBR(e.date)} — ${e.kg}kg`));
+    else lines.push("Sem registros de peso no período.");
+
     return lines.join("\n");
   }, [bp, bw, from, to, inRange]);
 
