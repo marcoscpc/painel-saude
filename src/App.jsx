@@ -7,7 +7,6 @@ import {
 
 const FORJA_URL = "https://forja-five.vercel.app";
 const PA_URL = "https://registro-pa.vercel.app";
-const PERIODS = [30, 90, 365];
 
 /* ============================ Datas ============================ */
 const todayStr = () => isoOf(new Date());
@@ -30,14 +29,16 @@ const MEAS_FIELDS = [
   ["abaixo_busto", "Abaixo do busto"], ["braco_esq", "Braço esq."], ["braco_dir", "Braço dir."],
 ];
 
-// Divide os últimos `days` dias em blocos de 7, do mais antigo pro mais recente —
-// é a granularidade usada no gráfico combinado pra deixar pressão, peso e treino comparáveis.
-function buildWeeks(days) {
-  const n = Math.max(2, Math.ceil(days / 7));
-  const today = new Date();
+// Divide o período (from/to) em blocos de 7 dias, do mais antigo pro mais recente, ancorados
+// em `to` — é a granularidade usada nos gráficos pra deixar pressão, peso e treino comparáveis.
+function buildWeeks(fromISO, toISO) {
+  const to = new Date(toISO + "T00:00:00");
+  const from = new Date(fromISO + "T00:00:00");
+  const totalDays = Math.max(1, Math.round((to - from) / 864e5) + 1);
+  const n = Math.max(2, Math.ceil(totalDays / 7));
   const weeks = [];
   for (let i = n - 1; i >= 0; i--) {
-    const end = new Date(today); end.setDate(end.getDate() - i * 7);
+    const end = new Date(to); end.setDate(end.getDate() - i * 7);
     const start = new Date(end); start.setDate(start.getDate() - 6);
     weeks.push({ start: isoOf(start), end: isoOf(end) });
   }
@@ -248,7 +249,8 @@ function Login() {
 
 /* ============================ Dashboard ============================ */
 function Dashboard({ session }) {
-  const [period, setPeriod] = useState(90);
+  const [from, setFrom] = useState(isoDaysAgo(90));
+  const [to, setTo] = useState(todayStr());
   const [tab, setTab] = useState("painel");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -261,8 +263,6 @@ function Dashboard({ session }) {
   useEffect(() => {
     let alive = true;
     setLoading(true); setErr(null);
-    const from = isoDaysAgo(period);
-    const to = todayStr();
     Promise.allSettled([
       fetchBpReadings(from + "T00:00:00.000Z", to + "T23:59:59.999Z"),
       fetchBodyWeight(from, to),
@@ -280,7 +280,7 @@ function Dashboard({ session }) {
       setErr(failed ? failed.reason?.message || "Erro ao carregar dados" : null);
     }).finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [period]);
+  }, [from, to]);
 
   return (
     <>
@@ -296,11 +296,11 @@ function Dashboard({ session }) {
         </div>
 
         {tab === "painel" && (
-          <PainelTab period={period} setPeriod={setPeriod} loading={loading} err={err}
+          <PainelTab from={from} to={to} setFrom={setFrom} setTo={setTo} loading={loading} err={err}
             bp={bp} bw={bw} workouts={workouts} />
         )}
         {tab === "relatorios" && (
-          <RelatoriosTab defaultFrom={isoDaysAgo(period)} defaultTo={todayStr()}
+          <RelatoriosTab defaultFrom={from} defaultTo={to}
             bp={bp} bw={bw} meas={meas} workouts={workouts} exercises={exercises} />
         )}
         {tab === "atalhos" && <AtalhosTab />}
@@ -310,8 +310,8 @@ function Dashboard({ session }) {
 }
 
 /* ---------- Painel: um gráfico por métrica, todos na mesma linha do tempo ---------- */
-function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
-  const weeks = useMemo(() => buildWeeks(period), [period]);
+function PainelTab({ from, to, setFrom, setTo, loading, err, bp, bw, workouts }) {
+  const weeks = useMemo(() => buildWeeks(from, to), [from, to]);
   const sysSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.sys), [bp, weeks]);
   const diaSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.dia), [bp, weeks]);
   const kgSeries = useMemo(() => weeklyAvg(bw, "kg", weeks), [bw, weeks]);
@@ -324,12 +324,9 @@ function PainelTab({ period, setPeriod, loading, err, bp, bw, workouts }) {
 
   return (
     <>
-      <div className="wrap" style={{ marginBottom: 14 }}>
-        {PERIODS.map((d) => (
-          <button key={d} className={"chip" + (d === period ? " on" : "")} onClick={() => setPeriod(d)}>
-            {d === 365 ? "12 meses" : `${d} dias`}
-          </button>
-        ))}
+      <div className="row" style={{ marginBottom: 14, gap: 10 }}>
+        <input className="inp" type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} />
+        <input className="inp" type="date" value={to} min={from} max={todayStr()} onChange={(e) => setTo(e.target.value)} />
       </div>
       {loading && <div className="card"><div className="empty">Carregando…</div></div>}
       {!loading && err && <div className="card"><div className="empty">Não foi possível carregar: {err}</div></div>}
