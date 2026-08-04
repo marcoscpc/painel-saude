@@ -157,7 +157,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 | 03/08/2026 | Seção "Picos do período" removida do relatório de cardiologia |
 | 03/08/2026 | Relatório de fisioterapia passa a reconhecer exercícios do tipo "Repetições (sem peso)" (novo no Forja): progressão e alerta de platô agora comparam repetições quando não há peso nem duração registrados, usando a nova coluna `top_reps` de `workout_exercises`. Corrige também um bug latente em que exercícios sem nenhum dos três valores comparáveis geravam um alerta de platô falso ("mesma carga (0s)"). |
 | 04/08/2026 | Tela de login ganha checkbox "Manter-me conectado por 15 dias" — controla por quanto tempo a sessão evita pedir login de novo (15 dias marcada, ~1 dia sem marcar), com prazo próprio do app independente da validade do token do Supabase. Link mágico expirado/já usado agora mostra aviso na tela em vez de falhar em silêncio (mesma correção aplicada no Forja e no registro-pa no mesmo dia) |
-| 04/08/2026 | Início da integração com Strava (cardio) — ver §12. Fase 1: tabelas `activities` e `strava_tokens` criadas no Supabase. Fase 2: aba Atalhos ganha card "Cardio (Strava)" com botão "Conectar com Strava" — fluxo OAuth completo via duas Edge Functions (`strava-connect`, `strava-callback`), testado ponta a ponta com a conta de Marcos (conectar, gravar token, ver status "Conectado"). Cardio ainda não aparece no gráfico nem nos relatórios (Fase 4) |
+| 04/08/2026 | Início da integração com Strava (cardio) — ver §12. Fase 1: tabelas `activities` e `strava_tokens` criadas no Supabase. Fase 2: aba Atalhos ganha card "Cardio (Strava)" com botão "Conectar com Strava" — fluxo OAuth completo via duas Edge Functions (`strava-connect`, `strava-callback`), testado ponta a ponta com a conta de Marcos (conectar, gravar token, ver status "Conectado"). Fase 3: Edge Function `strava-sync` agendada via `pg_cron` pra rodar 1x/dia, testada manualmente (7 atividades trazidas, sem duplicar num segundo disparo). Cardio ainda não aparece no gráfico nem nos relatórios (Fase 4) |
 
 ---
 
@@ -169,7 +169,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 - **Integração com Strava (cardio)** — traz corrida/caminhada do Strava pro painel, junto da musculação (que já vem do Forja). Plano em 5 fases:
   - ✅ Fase 1 (04/08/2026) — tabelas `activities` e `strava_tokens` no Supabase, isoladas por usuário.
   - ✅ Fase 2 (04/08/2026) — conexão OAuth ponta a ponta pra um usuário (Marcos): botão "Conectar com Strava" na aba Atalhos, Edge Functions `strava-connect`/`strava-callback`, token gravado e status "Conectado" confirmado na conta real.
-  - ⏳ Fase 3 — sincronização diária agendada (cron), upsert idempotente (re-sync não duplica).
+  - ✅ Fase 3 (04/08/2026) — Edge Function `strava-sync` (renova token quando precisa, busca só atividades novas desde a última sincronizada, upsert idempotente). Agendada via `pg_cron`/`pg_net` pra rodar 1x por dia (06:00 UTC). Testada manualmente: 7 atividades trazidas (corridas e caminhadas, com frequência cardíaca na maioria) e confirmado que rodar de novo não duplica.
   - ⏳ Fase 4 — cardio entra no gráfico combinado do Painel e no relatório da cardiologista (frequência cardíaca é o dado mais relevante ali).
   - ⏳ Fase 5 — segunda conexão OAuth (esposa), mapeada ao usuário dela.
 
