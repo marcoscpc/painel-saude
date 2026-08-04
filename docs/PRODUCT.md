@@ -55,7 +55,7 @@ Não há cadastro público, não há plano de terceiros usarem o app — é estr
 | Front-end | React 18 + Vite 5 | Mesmo padrão do Forja — facilita montar os gráficos combinados e as telas de relatório. |
 | Gráficos | A definir na implementação (ex.: biblioteca de charts React) | Precisa sobrepor 3 séries (pressão, peso, frequência de treino) na mesma linha do tempo. |
 | Formato do app | Página web comum, **não é PWA** | Diferente do Forja e do registro-pa: uso esperado é consultar de vez em quando (não o dia todo com o celular na mão), então não precisa de ícone na tela inicial nem de funcionar offline. |
-| Dados | Supabase (Postgres + Auth), **somente leitura** | Painel-Saúde nunca escreve nas tabelas — só lê o que Forja e registro-pa já enviaram. Mesmo projeto Supabase dos outros dois apps (schema criado na Fase A). |
+| Dados | Supabase (Postgres + Auth), **somente leitura nas tabelas** | Painel-Saúde nunca escreve direto nas tabelas — só lê o que Forja e registro-pa já enviaram. Mesmo projeto Supabase dos outros dois apps (schema criado na Fase A). Única exceção, desde 04/08/2026: o botão "Conectar com Strava" (ver §6 e §9), que aciona uma Edge Function — o app em si continua sem gravar nada. |
 | Autenticação | Login por link mágico (e-mail, sem senha) | Mesmo padrão já usado no Forja e no registro-pa. Cada usuário só enxerga os próprios dados (Row Level Security, já configurado na Fase A). |
 | Hospedagem | Vercel | Deploy automático a cada `git push` em `main`, mesmo padrão dos outros dois projetos. |
 | Repositório | `github.com/marcoscpc/painel-saude` | Projeto irmão de `App-Forja` e `registro-pa`, mesma conta. |
@@ -78,6 +78,8 @@ O Painel-Saúde não tem modelo de dados próprio — ele só **lê** as tabelas
 | `profiles` | Forja | `birth_date`, `height_cm` (usados para dar contexto no relatório, ex. idade) |
 
 Observação importante: **o dado só existe aqui a partir do momento em que a sincronização foi ligada** em cada app (01/08/2026 em diante) — com uma exceção: do lado do Forja, quem conecta um e-mail depois de já ter usado o app pode enviar o histórico local completo de uma vez (botão "Enviar histórico completo" em Configurações → Sincronização, ver `app-forja/docs/PRODUCT.md` §12), então histórico anterior a essa data também pode aparecer aqui, se essa pessoa já tiver feito isso. Sem esse envio manual, ainda não há como recuperar dado anterior à sincronização — ver §12.
+
+**Cardio (Strava), desde 04/08/2026 — em construção, ver §12:** duas tabelas novas alimentam essa frente, ainda não lidas pelo painel (isso é a Fase 4): `activities` (corridas/caminhadas trazidas do Strava — `type`, `start_date`, `distance_m`, `moving_time_s`, `average_heartrate`, `max_heartrate`, `average_speed`) e `strava_tokens` (token OAuth por usuário — **sem nenhuma política de leitura liberada pro cliente**, nem pro dono da linha; só uma Edge Function com privilégio de servidor consegue ler/escrever ali, e uma função `strava_connection_status()` expõe só "conectado ou não + desde quando" pro painel, sem nunca passar o token pelo navegador).
 
 ---
 
@@ -125,6 +127,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 - **Não é PWA**: ao contrário dos outros dois, o uso esperado é esporádico (revisar tendência, gerar relatório antes de uma consulta) — não precisa de ícone na tela inicial nem de funcionar offline.
 - **Relatório por especialista já na Fase D**: decidido em 02/08/2026 incluir os relatórios (fisio/cardiologista) já nesta fase, junto com o gráfico combinado, em vez de deixar para depois — é a parte que mais interessa ao uso real com os especialistas.
 - **Mesmo projeto Supabase, mesma autenticação**: reaproveita integralmente o que já foi validado nas Fases A-C, sem criar um sistema de login/dado paralelo.
+- **Exceção deliberada ao "somente leitura", 04/08/2026**: o botão "Conectar com Strava" (aba Atalhos) é a primeira ação que o Painel-Saúde dispara. Decidido morar aqui (e não no Forja, nem como link avulso) porque é aqui que o cardio vai aparecer depois de sincronizado. O app continua sem gravar em nenhuma tabela diretamente — quem grava é uma Edge Function no Supabase, que troca o código do Strava por um token e nunca devolve esse token pro navegador.
 
 ---
 
@@ -154,6 +157,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 | 03/08/2026 | Seção "Picos do período" removida do relatório de cardiologia |
 | 03/08/2026 | Relatório de fisioterapia passa a reconhecer exercícios do tipo "Repetições (sem peso)" (novo no Forja): progressão e alerta de platô agora comparam repetições quando não há peso nem duração registrados, usando a nova coluna `top_reps` de `workout_exercises`. Corrige também um bug latente em que exercícios sem nenhum dos três valores comparáveis geravam um alerta de platô falso ("mesma carga (0s)"). |
 | 04/08/2026 | Tela de login ganha checkbox "Manter-me conectado por 15 dias" — controla por quanto tempo a sessão evita pedir login de novo (15 dias marcada, ~1 dia sem marcar), com prazo próprio do app independente da validade do token do Supabase. Link mágico expirado/já usado agora mostra aviso na tela em vez de falhar em silêncio (mesma correção aplicada no Forja e no registro-pa no mesmo dia) |
+| 04/08/2026 | Início da integração com Strava (cardio) — ver §12. Fase 1: tabelas `activities` e `strava_tokens` criadas no Supabase. Fase 2: aba Atalhos ganha card "Cardio (Strava)" com botão "Conectar com Strava" — fluxo OAuth completo via duas Edge Functions (`strava-connect`, `strava-callback`), testado ponta a ponta com a conta de Marcos (conectar, gravar token, ver status "Conectado"). Cardio ainda não aparece no gráfico nem nos relatórios (Fase 4) |
 
 ---
 
@@ -162,6 +166,12 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 - ✅ **Fase D** — app criado: login por link mágico, painel combinado e relatórios por especialista (fisioterapeuta e cardiologista), conforme descrito acima. Implementada e publicada em produção em 02/08/2026 (`painel-saude-six.vercel.app`), e refinada com vários ajustes de relatório e gráfico nos dias seguintes (ver §11).
 - ✅ Envio do histórico já registrado antes da sincronização existir — resolvido do lado do Forja, com o botão manual "Enviar histórico completo" em Configurações → Sincronização (ver `app-forja/docs/PRODUCT.md` §12). Assim que esse histórico chega no Supabase, aparece aqui automaticamente, sem trabalho adicional no Painel-Saúde. O registro-pa ainda não tem um recurso equivalente, então o histórico de pressão anterior à sincronização continua indisponível.
 - ⏳ **Fase E (depois)** — fila de reenvio automática para quando a sincronização falhar por estar offline no momento do registro (hoje, se isso acontecer, o registro específico não é reenviado depois). Depende de mudança nos apps de origem (Forja e registro-pa), não no Painel-Saúde.
+- **Integração com Strava (cardio)** — traz corrida/caminhada do Strava pro painel, junto da musculação (que já vem do Forja). Plano em 5 fases:
+  - ✅ Fase 1 (04/08/2026) — tabelas `activities` e `strava_tokens` no Supabase, isoladas por usuário.
+  - ✅ Fase 2 (04/08/2026) — conexão OAuth ponta a ponta pra um usuário (Marcos): botão "Conectar com Strava" na aba Atalhos, Edge Functions `strava-connect`/`strava-callback`, token gravado e status "Conectado" confirmado na conta real.
+  - ⏳ Fase 3 — sincronização diária agendada (cron), upsert idempotente (re-sync não duplica).
+  - ⏳ Fase 4 — cardio entra no gráfico combinado do Painel e no relatório da cardiologista (frequência cardíaca é o dado mais relevante ali).
+  - ⏳ Fase 5 — segunda conexão OAuth (esposa), mapeada ao usuário dela.
 
 ---
 
