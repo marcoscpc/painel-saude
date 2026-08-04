@@ -74,6 +74,7 @@ O Painel-Saúde não tem modelo de dados próprio — ele só **lê** as tabelas
 | `body_weight` | Forja | `date`, `kg` |
 | `body_measurements` | Forja | `date`, `quadril`, `cintura`, `busto`, `abaixo_busto`, `braco_esq`, `braco_dir` |
 | `workout_sessions` | Forja | `date`, `ficha_id`, `ficha_name`, `exercise_count`, `done` |
+| `workout_exercises` | Forja | Detalhe por exercício de cada sessão concluída: `date`, `ficha_name`, `exercise_name`, `top_kg` (exercícios com peso), `top_duration_secs` (exercícios de tempo, ex.: prancha), `top_reps` (exercícios só de repetições, sem peso, ex.: flexão de braço — desde 03/08/2026), `sets_count`, `notes`. Cada linha só preenche **um** dos três campos de valor (`top_kg`/`top_duration_secs`/`top_reps`), conforme o tipo do exercício no Forja — os outros dois ficam `null` |
 | `profiles` | Forja | `birth_date`, `height_cm` (usados para dar contexto no relatório, ex. idade) |
 
 Observação importante: **o dado só existe aqui a partir do momento em que a sincronização foi ligada** em cada app (01/08/2026 em diante). Histórico anterior a essa data não aparece — isso é o que a Fase E pretende resolver (ver §12), enviando o histórico já registrado antes de existir sincronização.
@@ -140,6 +141,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 | Data | Entrega |
 |---|---|
 | 02/08/2026 | Documento de produto criado — Fase D iniciada pela definição do produto, antes de qualquer código. |
+| 03/08/2026 | Relatório de fisioterapia passa a reconhecer exercícios do tipo "Repetições (sem peso)" (novo no Forja): progressão e alerta de platô agora comparam repetições quando não há peso nem duração registrados, usando a nova coluna `top_reps` de `workout_exercises`. Corrige também um bug latente em que exercícios sem nenhum dos três valores comparáveis geravam um alerta de platô falso ("mesma carga (0s)"). |
 
 ---
 

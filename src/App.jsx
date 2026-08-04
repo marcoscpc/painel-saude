@@ -462,18 +462,26 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
         const delta = last.top_duration_secs - first.top_duration_secs;
         return `${name}: ${fmtSecs(first.top_duration_secs)} → ${fmtSecs(last.top_duration_secs)} (${delta >= 0 ? "+" : ""}${fmtSecs(Math.abs(delta))})`;
       }
+      if (first.top_reps != null && last.top_reps != null) {
+        const delta = last.top_reps - first.top_reps;
+        return `${name}: ${first.top_reps} reps → ${last.top_reps} reps (${delta >= 0 ? "+" : ""}${delta})`;
+      }
       return null;
     }).filter(Boolean);
 
-    // Mesma regra do "Fique de olho" do Forja: platô = mesma carga nas últimas 3-5 sessões;
-    // parado = sem registro há 14+ dias (contado até o fim do período do relatório).
+    // Mesma regra do "Fique de olho" do Forja: platô = mesma carga (ou repetições, pra
+    // exercícios sem peso) nas últimas 3-5 sessões; parado = sem registro há 14+ dias
+    // (contado até o fim do período do relatório). key() só compara quando há um valor
+    // real (peso, duração ou repetições) — evita falso platô em registros antigos sem
+    // nenhum dos três (sincronizados antes do tipo "repetições sem peso" existir).
     const attentionPoints = [];
     Object.keys(byExercise).sort().forEach((name) => {
       const desc = byExercise[name].slice().reverse();
-      const key = (e) => (e.top_kg != null ? e.top_kg : e.top_duration_secs);
+      const key = (e) => (e.top_kg != null ? e.top_kg : e.top_duration_secs != null ? e.top_duration_secs : e.top_reps);
       const lastN = desc.slice(0, 5);
-      if (lastN.length >= 3 && lastN.every((x) => key(x) === key(lastN[0]))) {
-        const val = lastN[0].top_kg != null ? `${lastN[0].top_kg}kg` : fmtSecs(lastN[0].top_duration_secs);
+      const k0 = key(lastN[0]);
+      if (k0 != null && lastN.length >= 3 && lastN.every((x) => key(x) === k0)) {
+        const val = lastN[0].top_kg != null ? `${lastN[0].top_kg}kg` : lastN[0].top_duration_secs != null ? fmtSecs(lastN[0].top_duration_secs) : `${lastN[0].top_reps} reps`;
         attentionPoints.push(`${name}: mesma carga (${val}) nas últimas ${lastN.length} sessões.`);
       }
       const gap = daysBetween(desc[0].date, to);
@@ -526,7 +534,7 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
     lines.push("");
 
     lines.push("EXERCÍCIOS POR SESSÃO");
-    const fmtExVal = (e) => (e.top_kg != null ? `${e.exercise_name} ${e.top_kg}kg` : e.top_duration_secs != null ? `${e.exercise_name} ${fmtSecs(e.top_duration_secs)}` : e.exercise_name);
+    const fmtExVal = (e) => (e.top_kg != null ? `${e.exercise_name} ${e.top_kg}kg` : e.top_duration_secs != null ? `${e.exercise_name} ${fmtSecs(e.top_duration_secs)}` : e.top_reps != null ? `${e.exercise_name} ${e.top_reps} reps` : e.exercise_name);
     if (ex.length) {
       const byDateEx = {};
       ex.forEach((e) => { (byDateEx[e.date] = byDateEx[e.date] || []).push(e); });
