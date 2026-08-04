@@ -1,7 +1,7 @@
 # Painel-Saúde — Documento de Produto
 
-**Versão:** 0.1 (rascunho — Fase D ainda não implementada) · **Data:** 02/08/2026 · **Autor:** Marcos (produto) com apoio de Claude (desenvolvimento)
-**Repositório:** a criar · **Deploy:** Vercel (planejado, mesmo padrão de `app-forja` e `registro-pa`)
+**Versão:** 1.0 · **Data:** 03/08/2026 · **Autor:** Marcos (produto) com apoio de Claude (desenvolvimento)
+**Repositório:** github.com/marcoscpc/painel-saude · **Deploy:** Vercel (produção: `painel-saude-six.vercel.app`, automático a cada push em `main`)
 
 ---
 
@@ -58,7 +58,7 @@ Não há cadastro público, não há plano de terceiros usarem o app — é estr
 | Dados | Supabase (Postgres + Auth), **somente leitura** | Painel-Saúde nunca escreve nas tabelas — só lê o que Forja e registro-pa já enviaram. Mesmo projeto Supabase dos outros dois apps (schema criado na Fase A). |
 | Autenticação | Login por link mágico (e-mail, sem senha) | Mesmo padrão já usado no Forja e no registro-pa. Cada usuário só enxerga os próprios dados (Row Level Security, já configurado na Fase A). |
 | Hospedagem | Vercel | Deploy automático a cada `git push` em `main`, mesmo padrão dos outros dois projetos. |
-| Repositório | Novo repositório GitHub `painel-saude` (a criar) | Projeto irmão de `App-Forja` e `registro-pa`, mesma conta. |
+| Repositório | `github.com/marcoscpc/painel-saude` | Projeto irmão de `App-Forja` e `registro-pa`, mesma conta. |
 
 **Por que somente leitura:** simplifica bastante o app — não precisa lidar com conflitos de escrita, validação de entrada nem duplicar as regras de negócio que já existem no Forja e no registro-pa. Qualquer correção de dado é feita no app de origem.
 
@@ -77,7 +77,7 @@ O Painel-Saúde não tem modelo de dados próprio — ele só **lê** as tabelas
 | `workout_exercises` | Forja | Detalhe por exercício de cada sessão concluída: `date`, `ficha_name`, `exercise_name`, `top_kg` (exercícios com peso), `top_duration_secs` (exercícios de tempo, ex.: prancha), `top_reps` (exercícios só de repetições, sem peso, ex.: flexão de braço — desde 03/08/2026), `sets_count`, `notes`. Cada linha só preenche **um** dos três campos de valor (`top_kg`/`top_duration_secs`/`top_reps`), conforme o tipo do exercício no Forja — os outros dois ficam `null` |
 | `profiles` | Forja | `birth_date`, `height_cm` (usados para dar contexto no relatório, ex. idade) |
 
-Observação importante: **o dado só existe aqui a partir do momento em que a sincronização foi ligada** em cada app (01/08/2026 em diante). Histórico anterior a essa data não aparece — isso é o que a Fase E pretende resolver (ver §12), enviando o histórico já registrado antes de existir sincronização.
+Observação importante: **o dado só existe aqui a partir do momento em que a sincronização foi ligada** em cada app (01/08/2026 em diante) — com uma exceção: do lado do Forja, quem conecta um e-mail depois de já ter usado o app pode enviar o histórico local completo de uma vez (botão "Enviar histórico completo" em Configurações → Sincronização, ver `app-forja/docs/PRODUCT.md` §12), então histórico anterior a essa data também pode aparecer aqui, se essa pessoa já tiver feito isso. Sem esse envio manual, ainda não há como recuperar dado anterior à sincronização — ver §12.
 
 ---
 
@@ -129,7 +129,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 ## 10. Limitações e riscos conhecidos
 
 - **Depende dos outros dois apps terem sincronização ligada**: sem e-mail conectado no Forja e no registro-pa, não há dado nenhum para mostrar aqui.
-- **Sem histórico anterior à sincronização** (antes de 01/08/2026) até a Fase E ser implementada.
+- **Sem histórico anterior à sincronização** (antes de 01/08/2026), a menos que a pessoa tenha usado o envio manual "Enviar histórico completo" do Forja (ver §6) — o registro-pa ainda não tem um recurso equivalente.
 - **Sem edição/correção de dado**: erro de registro precisa ser corrigido no app de origem (Forja ou registro-pa), não aqui.
 - **Sem modo offline**: precisa de internet para logar e carregar os dados (coerente com a decisão de não ser PWA).
 - **Sem testes automatizados**: mesmo padrão dos outros dois projetos pessoais — validação é manual, feita por Marcos após o deploy.
@@ -140,15 +140,25 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 
 | Data | Entrega |
 |---|---|
-| 02/08/2026 | Documento de produto criado — Fase D iniciada pela definição do produto, antes de qualquer código. |
+| 02/08/2026 | Documento de produto elaborado e, no mesmo dia, Fase D implementada e publicada em produção: scaffold React + Vite, login por link mágico, painel combinado, relatórios por especialista (fisioterapeuta e cardiologista) e atalhos pros outros dois apps (`painel-saude-six.vercel.app`) |
+| 02/08/2026 | Relatórios por especialista passam a listar cada registro do período dia a dia, em vez de um resumo condensado |
+| 02/08/2026 | Relatório da fisioterapeuta passa a listar os exercícios feitos no período e a progressão de carga, lendo a nova tabela `workout_exercises` |
+| 02/08/2026 | Gráfico combinado do Painel substituído por um gráfico por métrica, com escala real — pressão, peso e frequência de treino ficam mais fáceis de ler separadamente (antes eram séries normalizadas sobrepostas) |
+| 02/08/2026 | Relatório de fisioterapia reorganizado em seções claras (Resumo, Progressão de carga, Peso e medidas por data, Exercícios por sessão), em vez de blocos soltos |
+| 02/08/2026 | Eixos adicionados aos gráficos do Painel: linhas de grade com valores no eixo Y e datas no eixo X, em vez de só o máximo/mínimo soltos |
+| 02/08/2026 | Chips de período (30/90/365 dias) substituídos por campos de data inicial e final no Painel, mesmo padrão já usado em Relatórios |
+| 02/08/2026 | Relatório de cardiologia reformulado: separa medições por manhã/noite (mesma lógica MRPA do registro-pa), destaca os picos do período e alerta quando há medição em HAS estágio 2 ou 3 |
+| 02/08/2026 | Relatório da fisio ganha seção "Pontos de atenção" (platô de carga e exercício parado, mesma regra do Forja) e "Observações registradas" (notas por série sincronizadas) |
+| 03/08/2026 | Seção "Picos do período" removida do relatório de cardiologia |
 | 03/08/2026 | Relatório de fisioterapia passa a reconhecer exercícios do tipo "Repetições (sem peso)" (novo no Forja): progressão e alerta de platô agora comparam repetições quando não há peso nem duração registrados, usando a nova coluna `top_reps` de `workout_exercises`. Corrige também um bug latente em que exercícios sem nenhum dos três valores comparáveis geravam um alerta de platô falso ("mesma carga (0s)"). |
 
 ---
 
 ## 12. Roadmap
 
-- **Fase D (esta fase, ainda não implementada)**: criar o app, tela de login, painel combinado e relatórios por especialista, conforme descrito acima.
-- **Fase E (depois)**: envio do histórico já registrado nos dois apps antes de a sincronização existir; fila de reenvio para quando a sincronização falhar por estar offline no momento do registro.
+- ✅ **Fase D** — app criado: login por link mágico, painel combinado e relatórios por especialista (fisioterapeuta e cardiologista), conforme descrito acima. Implementada e publicada em produção em 02/08/2026 (`painel-saude-six.vercel.app`), e refinada com vários ajustes de relatório e gráfico nos dias seguintes (ver §11).
+- ✅ Envio do histórico já registrado antes da sincronização existir — resolvido do lado do Forja, com o botão manual "Enviar histórico completo" em Configurações → Sincronização (ver `app-forja/docs/PRODUCT.md` §12). Assim que esse histórico chega no Supabase, aparece aqui automaticamente, sem trabalho adicional no Painel-Saúde. O registro-pa ainda não tem um recurso equivalente, então o histórico de pressão anterior à sincronização continua indisponível.
+- ⏳ **Fase E (depois)** — fila de reenvio automática para quando a sincronização falhar por estar offline no momento do registro (hoje, se isso acontecer, o registro específico não é reenviado depois). Depende de mudança nos apps de origem (Forja e registro-pa), não no Painel-Saúde.
 
 ---
 
@@ -162,4 +172,4 @@ Como projeto pessoal, sucesso aqui significa:
 
 ---
 
-*Documento de produto elaborado antes da primeira linha de código do Painel-Saúde, como ponto de partida da Fase D do plano descrito em `app-forja/docs/PRODUCT.md` §12.*
+*Documento de produto elaborado antes da primeira linha de código do Painel-Saúde, como ponto de partida da Fase D do plano descrito em `app-forja/docs/PRODUCT.md` §12. Atualizado em 03/08/2026 a partir do estado real do código-fonte (`src/App.jsx`) e do histórico de commits do repositório `painel-saude`, já com a Fase D implantada em produção.*
