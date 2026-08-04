@@ -287,7 +287,7 @@ function Dashboard({ session }) {
   return (
     <>
       <header>
-        <div className="brand">Painel-Saúde<span className="sub">{session.user.email}</span></div>
+        <div className="brand">Painel-Saúde<span className="sub">Conectado como {session.user.email}</span></div>
         <button className="btn sm" onClick={signOut}>Sair</button>
       </header>
       <div className="main">
