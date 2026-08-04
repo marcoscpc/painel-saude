@@ -1,6 +1,6 @@
 # Painel-Saúde — Documento de Produto
 
-**Versão:** 1.0 · **Data:** 03/08/2026 · **Autor:** Marcos (produto) com apoio de Claude (desenvolvimento)
+**Versão:** 1.1 · **Data:** 04/08/2026 · **Autor:** Marcos (produto) com apoio de Claude (desenvolvimento)
 **Repositório:** github.com/marcoscpc/painel-saude · **Deploy:** Vercel (produção: `painel-saude-six.vercel.app`, automático a cada push em `main`)
 
 ---
@@ -85,8 +85,10 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 
 ### 7.1 Login
 
-- Tela única de entrada: campo de e-mail, botão "enviar link mágico" — mesmo fluxo já usado no Forja e no registro-pa.
-- Ao logar, o painel mostra os dados do usuário logado (Marcos ou esposa, conforme o e-mail).
+- Tela única de entrada: campo de e-mail, checkbox **"Manter-me conectado por 15 dias"** e botão "enviar link mágico" — mesmo fluxo já usado no Forja e no registro-pa. Sempre foi obrigatório entrar antes de ver qualquer dado (nunca existiu modo "sem login" aqui, diferente dos outros dois apps) — o que mudou em 04/08/2026 foi só o controle de por quanto tempo a sessão fica válida sem pedir login de novo.
+- Checkbox marcada: sessão válida por 15 dias sem pedir login de novo; desmarcada: cerca de 1 dia. Prazo controlado pelo próprio app (independente da validade do token do Supabase em si, que sozinho duraria bem mais).
+- Link mágico expirado ou já usado mostra um aviso claro na tela de login, em vez de falhar em silêncio.
+- Ao logar, o painel mostra os dados do usuário logado (Marcos ou esposa, conforme o e-mail) — cada um no próprio celular, sem conceito de perfil compartilhado (nunca existiu aqui).
 
 ### 7.2 Painel combinado (tela principal)
 
@@ -151,6 +153,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 | 02/08/2026 | Relatório da fisio ganha seção "Pontos de atenção" (platô de carga e exercício parado, mesma regra do Forja) e "Observações registradas" (notas por série sincronizadas) |
 | 03/08/2026 | Seção "Picos do período" removida do relatório de cardiologia |
 | 03/08/2026 | Relatório de fisioterapia passa a reconhecer exercícios do tipo "Repetições (sem peso)" (novo no Forja): progressão e alerta de platô agora comparam repetições quando não há peso nem duração registrados, usando a nova coluna `top_reps` de `workout_exercises`. Corrige também um bug latente em que exercícios sem nenhum dos três valores comparáveis geravam um alerta de platô falso ("mesma carga (0s)"). |
+| 04/08/2026 | Tela de login ganha checkbox "Manter-me conectado por 15 dias" — controla por quanto tempo a sessão evita pedir login de novo (15 dias marcada, ~1 dia sem marcar), com prazo próprio do app independente da validade do token do Supabase. Link mágico expirado/já usado agora mostra aviso na tela em vez de falhar em silêncio (mesma correção aplicada no Forja e no registro-pa no mesmo dia) |
 
 ---
 

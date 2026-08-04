@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { sendMagicLink, signOut, watchSession } from "./lib/auth";
+import { sendMagicLink, signOut, watchSession, consumeAuthError } from "./lib/auth";
 import { supabase } from "./lib/supabaseClient";
 import {
   fetchBpReadings, fetchBodyWeight, fetchBodyMeasurements, fetchWorkoutSessions, fetchWorkoutExercises,
@@ -167,7 +167,9 @@ const CSS = `
 /* ============================ App ============================ */
 export default function App() {
   const [session, setSession] = useState(undefined); // undefined = carregando sessão
+  const [authError, setAuthError] = useState(null);
   useEffect(() => watchSession(setSession), []);
+  useEffect(() => { setAuthError(consumeAuthError()); }, []);
 
   return (
     <div className="ps">
@@ -177,7 +179,7 @@ export default function App() {
       ) : !supabase ? (
         <MissingConfig />
       ) : !session ? (
-        <Login />
+        <Login authError={authError} />
       ) : (
         <Dashboard session={session} />
       )}
@@ -199,9 +201,12 @@ function MissingConfig() {
 }
 
 /* ============================ Login ============================ */
-function Login() {
+function Login({ authError }) {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState(null); // {kind:'ok'|'err', text}
+  const [keep, setKeep] = useState(true);
+  const [status, setStatus] = useState(
+    authError ? { kind: "err", text: "Link inválido ou expirado: " + authError } : null
+  );
   const [sending, setSending] = useState(false);
 
   const send = async () => {
@@ -209,7 +214,7 @@ function Login() {
     if (!e) { setStatus({ kind: "err", text: "Digite um e-mail." }); return; }
     setSending(true); setStatus(null);
     try {
-      const { error } = await sendMagicLink(e);
+      const { error } = await sendMagicLink(e, keep);
       setStatus(error
         ? { kind: "err", text: "Erro: " + error.message }
         : { kind: "ok", text: "Link enviado! Confira seu e-mail e abra o link neste mesmo aparelho." });
@@ -235,9 +240,18 @@ function Login() {
             <input className="inp" type="email" placeholder="seu@email.com" value={email}
               onChange={(e) => setEmail(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
           </div>
+          <label className="row small" style={{ gap: 8, marginBottom: 14, cursor: "pointer" }}>
+            <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+            Manter-me conectado por 15 dias
+          </label>
           <button className="btn pri blk" disabled={sending} onClick={send}>
             {sending ? "Enviando…" : "Enviar link mágico"}
           </button>
+          {!keep && (
+            <p className="small muted" style={{ marginTop: 8 }}>
+              Sem marcar essa opção, o app vai pedir login de novo em cerca de 1 dia.
+            </p>
+          )}
           {status && (
             <p className="small" style={{ marginTop: 10, color: status.kind === "err" ? "var(--bad)" : "var(--good)" }}>
               {status.text}
