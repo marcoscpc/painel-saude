@@ -60,6 +60,17 @@ export async function fetchWorkoutExercises(fromDate, toDate) {
   return data || [];
 }
 
+export async function fetchActivities(fromISO, toISO) {
+  const { data, error } = await supabase
+    .from("activities")
+    .select("start_date,type,distance_m,moving_time_s,average_heartrate,max_heartrate,average_speed")
+    .gte("start_date", fromISO)
+    .lte("start_date", toISO)
+    .order("start_date");
+  if (error) throw error;
+  return data || [];
+}
+
 export async function fetchProfile(userId) {
   const { data, error } = await supabase
     .from("profiles")

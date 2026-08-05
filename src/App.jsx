@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { sendMagicLink, signOut, watchSession, consumeAuthError } from "./lib/auth";
 import { supabase } from "./lib/supabaseClient";
 import {
-  fetchBpReadings, fetchBodyWeight, fetchBodyMeasurements, fetchWorkoutSessions, fetchWorkoutExercises,
+  fetchBpReadings, fetchBodyWeight, fetchBodyMeasurements, fetchWorkoutSessions, fetchWorkoutExercises, fetchActivities,
 } from "./lib/data";
 import { connectStrava, getStravaStatus } from "./lib/strava";
 
@@ -25,6 +25,11 @@ const fmtSecs = (n) => {
   if (v < 60) return `${v}s`;
   const m = Math.floor(v / 60), s = v % 60;
   return `${m}:${String(s).padStart(2, "0")}`;
+};
+const fmtHoursMin = (secs) => {
+  const h = Math.floor(secs / 3600);
+  const m = Math.round((secs % 3600) / 60);
+  return h ? `${h}h${String(m).padStart(2, "0")}` : `${m}min`;
 };
 
 const MEAS_FIELDS = [
@@ -75,6 +80,9 @@ function weeklyAvg(rows, key, weeks) {
 }
 function weeklyWorkoutCount(rows, weeks) {
   return weeks.map((w) => rows.filter((r) => inWeek(r.date, w) && r.done).length);
+}
+function weeklyActivityCount(rows, weeks) {
+  return weeks.map((w) => rows.filter((r) => inWeek(r.start_date.slice(0, 10), w)).length);
 }
 
 // Várias séries (podem ter buracos) no mesmo eixo Y real, em vez de normalizadas —
@@ -279,6 +287,7 @@ function Dashboard({ session, stravaFlash }) {
   const [meas, setMeas] = useState([]);
   const [workouts, setWorkouts] = useState([]);
   const [exercises, setExercises] = useState([]);
+  const [activities, setActivities] = useState([]);
 
   useEffect(() => {
     let alive = true;
@@ -289,14 +298,16 @@ function Dashboard({ session, stravaFlash }) {
       fetchBodyMeasurements(from, to),
       fetchWorkoutSessions(from, to),
       fetchWorkoutExercises(from, to),
-    ]).then(([bpR, bwR, measR, woR, exR]) => {
+      fetchActivities(from + "T00:00:00.000Z", to + "T23:59:59.999Z"),
+    ]).then(([bpR, bwR, measR, woR, exR, actR]) => {
       if (!alive) return;
       setBp(bpR.status === "fulfilled" ? bpR.value : []);
       setBw(bwR.status === "fulfilled" ? bwR.value : []);
       setMeas(measR.status === "fulfilled" ? measR.value : []);
       setWorkouts(woR.status === "fulfilled" ? woR.value : []);
       setExercises(exR.status === "fulfilled" ? exR.value : []);
-      const failed = [bpR, bwR, measR, woR, exR].find((r) => r.status === "rejected");
+      setActivities(actR.status === "fulfilled" ? actR.value : []);
+      const failed = [bpR, bwR, measR, woR, exR, actR].find((r) => r.status === "rejected");
       setErr(failed ? failed.reason?.message || "Erro ao carregar dados" : null);
     }).finally(() => alive && setLoading(false));
     return () => { alive = false; };
@@ -317,11 +328,11 @@ function Dashboard({ session, stravaFlash }) {
 
         {tab === "painel" && (
           <PainelTab from={from} to={to} setFrom={setFrom} setTo={setTo} loading={loading} err={err}
-            bp={bp} bw={bw} workouts={workouts} />
+            bp={bp} bw={bw} workouts={workouts} activities={activities} />
         )}
         {tab === "relatorios" && (
           <RelatoriosTab defaultFrom={from} defaultTo={to}
-            bp={bp} bw={bw} meas={meas} workouts={workouts} exercises={exercises} />
+            bp={bp} bw={bw} meas={meas} workouts={workouts} exercises={exercises} activities={activities} />
         )}
         {tab === "atalhos" && <AtalhosTab stravaFlash={stravaFlash} />}
       </div>
@@ -330,17 +341,19 @@ function Dashboard({ session, stravaFlash }) {
 }
 
 /* ---------- Painel: um gráfico por métrica, todos na mesma linha do tempo ---------- */
-function PainelTab({ from, to, setFrom, setTo, loading, err, bp, bw, workouts }) {
+function PainelTab({ from, to, setFrom, setTo, loading, err, bp, bw, workouts, activities }) {
   const weeks = useMemo(() => buildWeeks(from, to), [from, to]);
   const sysSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.sys), [bp, weeks]);
   const diaSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.dia), [bp, weeks]);
   const kgSeries = useMemo(() => weeklyAvg(bw, "kg", weeks), [bw, weeks]);
   const woSeries = useMemo(() => weeklyWorkoutCount(workouts, weeks), [workouts, weeks]);
+  const cardioSeries = useMemo(() => weeklyActivityCount(activities, weeks), [activities, weeks]);
 
   const anyBp = sysSeries.some((v) => v != null);
   const anyKg = kgSeries.some((v) => v != null);
   const anyWo = woSeries.some((v) => v);
-  const anyData = anyBp || anyKg || anyWo;
+  const anyCardio = cardioSeries.some((v) => v);
+  const anyData = anyBp || anyKg || anyWo || anyCardio;
 
   return (
     <>
@@ -356,6 +369,7 @@ function PainelTab({ from, to, setFrom, setTo, loading, err, bp, bw, workouts })
       {!loading && !err && anyBp && <BpChart sys={sysSeries} dia={diaSeries} weeks={weeks} />}
       {!loading && !err && anyKg && <WeightChart kg={kgSeries} weeks={weeks} />}
       {!loading && !err && anyWo && <WorkoutChart counts={woSeries} weeks={weeks} />}
+      {!loading && !err && anyCardio && <CardioChart counts={cardioSeries} weeks={weeks} activities={activities} />}
     </>
   );
 }
@@ -446,8 +460,51 @@ function WorkoutChart({ counts, weeks }) {
   );
 }
 
+function CardioChart({ counts, weeks, activities }) {
+  const W = 600, H = 120, PADX = 24, PADTOP = 6, PADBOTTOM = 24;
+  const max = Math.max(1, ...counts.map((v) => v || 0));
+  const n = counts.length;
+  const barAreaW = W - PADX * 2;
+  const barW = barAreaW / n;
+  const chartH = H - PADTOP - PADBOTTOM;
+  const py = (v) => H - PADBOTTOM - (v / max) * chartH;
+  const last = counts.length ? counts[counts.length - 1] : 0;
+  const idxs = xAxisWeekIndexes(weeks);
+
+  const totalKm = activities.reduce((a, r) => a + (r.distance_m || 0), 0) / 1000;
+  const totalSecs = activities.reduce((a, r) => a + (r.moving_time_s || 0), 0);
+  const hrRows = activities.filter((r) => r.average_heartrate != null);
+  const avgHr = hrRows.length ? hrRows.reduce((a, r) => a + r.average_heartrate, 0) / hrRows.length : null;
+
+  return (
+    <div className="card">
+      <h2 className="sec">Cardio (Strava) — atividades por semana</h2>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: 120, display: "block" }}>
+        <line x1={PADX} x2={W - PADX} y1={py(0)} y2={py(0)} stroke="var(--line)" />
+        <text x={PADX} y={py(max) - 3} fontSize="9" fill="var(--muted)">{max}x</text>
+        <text x={PADX} y={py(0) - 3} fontSize="9" fill="var(--muted)">0</text>
+        {counts.map((c, i) => {
+          const v = c || 0;
+          const barH = py(0) - py(v);
+          return <rect key={i} x={PADX + i * barW + 1} y={py(v)} width={Math.max(1, barW - 2)} height={Math.max(1, barH)} fill="#FC5200" rx="2" />;
+        })}
+        {idxs.map((i) => (
+          <text key={i} x={PADX + i * barW + barW / 2} y={H - 4} fontSize="9" fill="var(--muted)"
+            textAnchor={i === 0 ? "start" : i === n - 1 ? "end" : "middle"}>
+            {fmtBR(weeks[i].start)}
+          </text>
+        ))}
+      </svg>
+      <p className="small muted" style={{ marginTop: 8 }}>
+        Última semana: {last}x · {totalKm.toFixed(1)}km no período · {fmtHoursMin(totalSecs)}
+        {avgHr != null ? ` · FC média ${avgHr.toFixed(0)}bpm` : ""}
+      </p>
+    </div>
+  );
+}
+
 /* ---------- Relatórios por especialista ---------- */
-function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercises }) {
+function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercises, activities }) {
   const [tipo, setTipo] = useState("fisio");
   const [from, setFrom] = useState(defaultFrom);
   const [to, setTo] = useState(defaultTo);
@@ -609,9 +666,31 @@ function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, workouts, exercis
     lines.push("PESO");
     if (w.length) w.forEach((e) => lines.push(`${fmtBR(e.date)} — ${e.kg}kg`));
     else lines.push("Sem registros de peso no período.");
+    lines.push("");
+
+    lines.push("CARDIO (STRAVA)");
+    const act = activities.filter((e) => inRange(e.start_date.slice(0, 10)));
+    if (act.length) {
+      const totalKm = act.reduce((a, e) => a + (e.distance_m || 0), 0) / 1000;
+      const totalSecs = act.reduce((a, e) => a + (e.moving_time_s || 0), 0);
+      const hrRows = act.filter((e) => e.average_heartrate != null);
+      const avgHr = hrRows.length ? hrRows.reduce((a, e) => a + e.average_heartrate, 0) / hrRows.length : null;
+      const maxHrRows = act.filter((e) => e.max_heartrate != null);
+      const maxHr = maxHrRows.length ? Math.max(...maxHrRows.map((e) => e.max_heartrate)) : null;
+      lines.push(`${act.length} atividade(s) — ${totalKm.toFixed(1)}km · ${fmtHoursMin(totalSecs)}`
+        + (avgHr != null ? ` · FC média ${avgHr.toFixed(0)}bpm` : "")
+        + (maxHr != null ? ` · FC máxima ${maxHr.toFixed(0)}bpm` : ""));
+      act.forEach((e) => {
+        const km = ((e.distance_m || 0) / 1000).toFixed(2);
+        const hr = e.average_heartrate != null
+          ? ` — FC média ${Math.round(e.average_heartrate)}bpm${e.max_heartrate != null ? ` (máx ${Math.round(e.max_heartrate)})` : ""}`
+          : "";
+        lines.push(`${fmtBR(e.start_date.slice(0, 10))} — ${e.type === "Run" ? "Corrida" : "Caminhada"}, ${km}km, ${fmtHoursMin(e.moving_time_s || 0)}${hr}`);
+      });
+    } else lines.push("Sem atividades de cardio (Strava) no período.");
 
     return lines.join("\n");
-  }, [bp, bw, from, to, inRange]);
+  }, [bp, bw, activities, from, to, inRange]);
 
   const text = tipo === "fisio" ? fisioText : cardioText;
 

@@ -76,10 +76,11 @@ O Painel-Saúde não tem modelo de dados próprio — ele só **lê** as tabelas
 | `workout_sessions` | Forja | `date`, `ficha_id`, `ficha_name`, `exercise_count`, `done` |
 | `workout_exercises` | Forja | Detalhe por exercício de cada sessão concluída: `date`, `ficha_name`, `exercise_name`, `top_kg` (exercícios com peso), `top_duration_secs` (exercícios de tempo, ex.: prancha), `top_reps` (exercícios só de repetições, sem peso, ex.: flexão de braço — desde 03/08/2026), `sets_count`, `notes`. Cada linha só preenche **um** dos três campos de valor (`top_kg`/`top_duration_secs`/`top_reps`), conforme o tipo do exercício no Forja — os outros dois ficam `null` |
 | `profiles` | Forja | `birth_date`, `height_cm` (usados para dar contexto no relatório, ex. idade) |
+| `activities` | Strava (via integração própria, ver §6 mais abaixo e §12) | `start_date`, `type` (`Run`/`Walk`), `distance_m`, `moving_time_s`, `average_heartrate`, `max_heartrate` |
 
 Observação importante: **o dado só existe aqui a partir do momento em que a sincronização foi ligada** em cada app (01/08/2026 em diante) — com uma exceção: do lado do Forja, quem conecta um e-mail depois de já ter usado o app pode enviar o histórico local completo de uma vez (botão "Enviar histórico completo" em Configurações → Sincronização, ver `app-forja/docs/PRODUCT.md` §12), então histórico anterior a essa data também pode aparecer aqui, se essa pessoa já tiver feito isso. Sem esse envio manual, ainda não há como recuperar dado anterior à sincronização — ver §12.
 
-**Cardio (Strava), desde 04/08/2026 — em construção, ver §12:** duas tabelas novas alimentam essa frente, ainda não lidas pelo painel (isso é a Fase 4): `activities` (corridas/caminhadas trazidas do Strava — `type`, `start_date`, `distance_m`, `moving_time_s`, `average_heartrate`, `max_heartrate`, `average_speed`) e `strava_tokens` (token OAuth por usuário — **sem nenhuma política de leitura liberada pro cliente**, nem pro dono da linha; só uma Edge Function com privilégio de servidor consegue ler/escrever ali, e uma função `strava_connection_status()` expõe só "conectado ou não + desde quando" pro painel, sem nunca passar o token pelo navegador).
+**Cardio (Strava), desde 04/08/2026 — ver §12:** duas tabelas novas alimentam essa frente: `activities` (corridas/caminhadas trazidas do Strava — `type`, `start_date`, `distance_m`, `moving_time_s`, `average_heartrate`, `max_heartrate`, `average_speed`), já lida pelo painel desde 05/08/2026 (gráfico combinado + relatório da cardiologista), e `strava_tokens` (token OAuth por usuário — **sem nenhuma política de leitura liberada pro cliente**, nem pro dono da linha; só uma Edge Function com privilégio de servidor consegue ler/escrever ali, e uma função `strava_connection_status()` expõe só "conectado ou não + desde quando" pro painel, sem nunca passar o token pelo navegador).
 
 ---
 
@@ -94,14 +95,14 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 
 ### 7.2 Painel combinado (tela principal)
 
-- Gráfico único cruzando, na mesma linha do tempo: pressão arterial (sistólica/diastólica), peso corporal e frequência de treino (treinos concluídos por semana).
+- Gráfico único cruzando, na mesma linha do tempo: pressão arterial (sistólica/diastólica), peso corporal, frequência de treino (treinos concluídos por semana) e, desde 05/08/2026, cardio do Strava (corridas/caminhadas por semana, com distância total, tempo total e frequência cardíaca média do período).
 - Filtro por período (ex.: 30 / 90 / 365 dias — mesma lógica de filtro de período já usada no Insights do Forja).
 - Indicação visual clara de lacunas (períodos sem sincronização ligada ou sem registro).
 
 ### 7.3 Relatório por especialista
 
 - **Relatório para fisioterapeuta**: peso, medidas corporais e frequência/volume de treino no período escolhido.
-- **Relatório para cardiologista**: pressão arterial (com a classificação já usada no registro-pa) e peso no período escolhido.
+- **Relatório para cardiologista**: pressão arterial (com a classificação já usada no registro-pa), peso e, desde 05/08/2026, cardio do Strava (lista de corridas/caminhadas do período com distância, duração e frequência cardíaca, mais um resumo com totais e FC média/máxima).
 - Filtro de data inicial/final, com opção de compartilhar (menu nativo de compartilhamento do celular, ou cópia de texto/link) — mesmo padrão do relatório de peso e medidas já existente no Forja.
 
 ### 7.4 Atalhos
@@ -157,7 +158,8 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 | 03/08/2026 | Seção "Picos do período" removida do relatório de cardiologia |
 | 03/08/2026 | Relatório de fisioterapia passa a reconhecer exercícios do tipo "Repetições (sem peso)" (novo no Forja): progressão e alerta de platô agora comparam repetições quando não há peso nem duração registrados, usando a nova coluna `top_reps` de `workout_exercises`. Corrige também um bug latente em que exercícios sem nenhum dos três valores comparáveis geravam um alerta de platô falso ("mesma carga (0s)"). |
 | 04/08/2026 | Tela de login ganha checkbox "Manter-me conectado por 15 dias" — controla por quanto tempo a sessão evita pedir login de novo (15 dias marcada, ~1 dia sem marcar), com prazo próprio do app independente da validade do token do Supabase. Link mágico expirado/já usado agora mostra aviso na tela em vez de falhar em silêncio (mesma correção aplicada no Forja e no registro-pa no mesmo dia) |
-| 04/08/2026 | Início da integração com Strava (cardio) — ver §12. Fase 1: tabelas `activities` e `strava_tokens` criadas no Supabase. Fase 2: aba Atalhos ganha card "Cardio (Strava)" com botão "Conectar com Strava" — fluxo OAuth completo via duas Edge Functions (`strava-connect`, `strava-callback`), testado ponta a ponta com a conta de Marcos (conectar, gravar token, ver status "Conectado"). Fase 3: Edge Function `strava-sync` agendada via `pg_cron` pra rodar 1x/dia, testada manualmente (7 atividades trazidas, sem duplicar num segundo disparo). Cardio ainda não aparece no gráfico nem nos relatórios (Fase 4) |
+| 04/08/2026 | Início da integração com Strava (cardio) — ver §12. Fase 1: tabelas `activities` e `strava_tokens` criadas no Supabase. Fase 2: aba Atalhos ganha card "Cardio (Strava)" com botão "Conectar com Strava" — fluxo OAuth completo via duas Edge Functions (`strava-connect`, `strava-callback`), testado ponta a ponta com a conta de Marcos (conectar, gravar token, ver status "Conectado"). Fase 3: Edge Function `strava-sync` agendada via `pg_cron` pra rodar 1x/dia, testada manualmente (7 atividades trazidas, sem duplicar num segundo disparo) |
+| 05/08/2026 | Fase 4 da integração com Strava: cardio passa a aparecer no Painel (gráfico de atividades por semana, com distância/tempo/FC média do período) e no relatório da cardiologista (lista de atividades + resumo com FC média/máxima) |
 
 ---
 
@@ -170,7 +172,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
   - ✅ Fase 1 (04/08/2026) — tabelas `activities` e `strava_tokens` no Supabase, isoladas por usuário.
   - ✅ Fase 2 (04/08/2026) — conexão OAuth ponta a ponta pra um usuário (Marcos): botão "Conectar com Strava" na aba Atalhos, Edge Functions `strava-connect`/`strava-callback`, token gravado e status "Conectado" confirmado na conta real.
   - ✅ Fase 3 (04/08/2026) — Edge Function `strava-sync` (renova token quando precisa, busca só atividades novas desde a última sincronizada, upsert idempotente). Agendada via `pg_cron`/`pg_net` pra rodar 1x por dia (06:00 UTC). Testada manualmente: 7 atividades trazidas (corridas e caminhadas, com frequência cardíaca na maioria) e confirmado que rodar de novo não duplica.
-  - ⏳ Fase 4 — cardio entra no gráfico combinado do Painel e no relatório da cardiologista (frequência cardíaca é o dado mais relevante ali).
+  - ✅ Fase 4 (05/08/2026) — cardio entra no gráfico combinado do Painel (atividades por semana, com distância/tempo/FC média) e no relatório da cardiologista (lista de atividades do período + resumo com FC média/máxima).
   - ⏳ Fase 5 — segunda conexão OAuth (esposa), mapeada ao usuário dela.
 
 ---
