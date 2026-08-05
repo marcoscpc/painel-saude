@@ -133,8 +133,8 @@ const lastValue = (values) => { for (let i = values.length - 1; i >= 0; i--) if 
 /* ============================ Estilos ============================ */
 const CSS = `
 .ps *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-.ps{--bg:#12151A;--bg2:#191D24;--card:#1D222A;--card2:#252B34;--line:#2E3440;
-  --text:#ECEEF2;--muted:#8B93A1;--acc:#4FA3E0;--accd:#3679AE;--good:#46B98A;--bad:#E06A5B;--chip:#20262F;
+.ps{--bg:#14161B;--bg2:#1B1E25;--card:#1F232B;--card2:#262B34;--line:#313742;
+  --text:#ECEEF2;--muted:#8B93A1;--acc:#F2A93B;--accd:#C7861F;--good:#46B98A;--bad:#E06A5B;--chip:#232833;
   background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;
   font-family:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   max-width:640px;margin:0 auto;line-height:1.35;}
@@ -151,12 +151,12 @@ const CSS = `
 .ps button{font:inherit;cursor:pointer;border:none;background:none;color:inherit}
 .ps .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border-radius:12px;padding:11px 14px;
   font-weight:700;font-size:14px;background:var(--card2);border:1px solid var(--line);color:var(--text);min-height:44px}
-.ps .btn.pri{background:var(--acc);color:#08151F;border-color:var(--acc)}
+.ps .btn.pri{background:var(--acc);color:#1a1205;border-color:var(--acc)}
 .ps .btn.pri:disabled{opacity:.5}
 .ps .btn.blk{width:100%}
 .ps .btn.sm{padding:8px 12px;min-height:36px;font-size:13px;border-radius:10px}
 .ps .chip{padding:9px 14px;border-radius:999px;background:var(--chip);border:1px solid var(--line);font-weight:700;font-size:13.5px;min-height:38px}
-.ps .chip.on{background:var(--acc);color:#08151F;border-color:var(--acc)}
+.ps .chip.on{background:var(--acc);color:#1a1205;border-color:var(--acc)}
 .ps .row{display:flex;align-items:center;gap:8px}
 .ps .wrap{display:flex;flex-wrap:wrap;gap:8px}
 .ps .inp{width:100%;background:var(--bg2);border:1px solid var(--line);border-radius:10px;color:var(--text);
@@ -168,7 +168,7 @@ const CSS = `
 .ps .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px;font-size:12.5px}
 .ps .legend .dot{width:9px;height:9px;border-radius:999px;display:inline-block;margin-right:5px}
 .ps .empty{padding:20px 0;text-align:center;color:var(--muted);font-size:13.5px}
-.ps textarea.inp{min-height:160px;resize:vertical;font-family:ui-monospace,"SF Mono",monospace;font-size:12px}
+.ps textarea.inp{height:60vh;min-height:320px;resize:vertical;font-family:ui-monospace,"SF Mono",monospace;font-size:12px}
 .ps a.link{color:var(--acc);text-decoration:none;font-weight:700}
 .ps .splash{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted)}
 `;
