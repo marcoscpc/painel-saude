@@ -31,12 +31,25 @@ async function signState(userId: string, secret: string): Promise<string> {
   return `${payloadB64}.${base64UrlEncode(new Uint8Array(sig))}`;
 }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+// Só o painel-saude (produção e dev local) precisa chamar esta função —
+// diferente de um proxy de dado público, aqui o request carrega o JWT do
+// usuário logado, então restringimos a origem em vez de refletir "*".
+const ALLOWED_ORIGINS = [
+  Deno.env.get("PAINEL_SAUDE_URL") || "https://painel-saude-six.vercel.app",
+  "http://localhost:5175",
+];
+
+function buildCorsHeaders(origin: string | null) {
+  const allowOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Vary": "Origin",
+  };
+}
 
 Deno.serve(async (req) => {
+  const corsHeaders = buildCorsHeaders(req.headers.get("Origin"));
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
@@ -70,6 +83,9 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ url: authorizeUrl.toString() }), { headers: jsonHeaders });
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: jsonHeaders });
+    // Não devolve String(err) cru pro cliente -- pode expor detalhe interno
+    // (stack, mensagem de lib); loga no servidor e responde algo genérico.
+    console.error("strava-connect:", err);
+    return new Response(JSON.stringify({ error: "Não foi possível conectar com o Strava agora." }), { status: 500, headers: jsonHeaders });
   }
 });
