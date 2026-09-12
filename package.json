@@ -17,6 +17,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "oxlint": "^1.79.0",
+    "terser": "^5.51.2",
     "vite": "^5.4.8"
   }
 }
