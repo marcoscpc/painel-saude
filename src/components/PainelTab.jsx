@@ -7,7 +7,7 @@ import WorkoutChart from "./WorkoutChart";
 import CardioChart from "./CardioChart";
 
 /* ---------- Painel: um gráfico por métrica, todos na mesma linha do tempo ---------- */
-export default function PainelTab({ from, to, setFrom, setTo, loading, err, bp, bw, workouts, activities }) {
+export default function PainelTab({ from, to, setFrom, setTo, loading, err, onRetry, bp, bw, workouts, activities }) {
   const weeks = useMemo(() => buildWeeks(from, to), [from, to]);
   const sysSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.sys), [bp, weeks]);
   const diaSeries = useMemo(() => weeklyBpAvg(bp, weeks).map((w) => w.dia), [bp, weeks]);
@@ -28,7 +28,7 @@ export default function PainelTab({ from, to, setFrom, setTo, loading, err, bp, 
         <input className="inp" type="date" value={to} min={from} max={todayStr()} onChange={(e) => setTo(e.target.value)} aria-label="Data final" />
       </div>
       {loading && <div className="card"><div className="empty">Carregando…</div></div>}
-      {!loading && err && <div className="card"><div className="empty">Não foi possível carregar: {err}</div></div>}
+      {!loading && err && <div className="card"><div className="empty">Não foi possível carregar: {err}</div><button className="btn sm" onClick={onRetry}>Tentar de novo</button></div>}
       {!loading && !err && !anyData && (
         <div className="card"><div className="empty">Sem dados sincronizados neste período ainda.</div></div>
       )}
