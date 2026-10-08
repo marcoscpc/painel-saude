@@ -59,19 +59,31 @@ Deno.serve(async (req) => {
   const clientSecret = Deno.env.get("STRAVA_CLIENT_SECRET");
 
   if (error || !code || !state) return redirectTo("denied");
-  if (!clientId || !clientSecret) return redirectTo("error");
+  if (!clientId || !clientSecret) {
+    console.error("strava-callback: STRAVA_CLIENT_ID/SECRET não configurados");
+    return redirectTo("error");
+  }
 
   const userId = await verifyState(state, serviceRoleKey);
-  if (!userId) return redirectTo("error");
+  if (!userId) {
+    console.error("strava-callback: state inválido ou expirado");
+    return redirectTo("error");
+  }
 
   const tokenResp = await fetch("https://www.strava.com/oauth/token", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ client_id: clientId, client_secret: clientSecret, code, grant_type: "authorization_code" }),
   });
-  if (!tokenResp.ok) return redirectTo("error");
+  if (!tokenResp.ok) {
+    console.error("strava-callback: troca de code falhou, status", tokenResp.status);
+    return redirectTo("error");
+  }
   const tokenData = await tokenResp.json();
-  if (!tokenData.access_token || !tokenData.athlete?.id) return redirectTo("error");
+  if (!tokenData.access_token || !tokenData.athlete?.id) {
+    console.error("strava-callback: resposta do Strava sem access_token/athlete");
+    return redirectTo("error");
+  }
 
   const admin = createClient(supabaseUrl, serviceRoleKey);
   const { error: upsertError } = await admin.from("strava_tokens").upsert(
@@ -85,7 +97,10 @@ Deno.serve(async (req) => {
     },
     { onConflict: "user_id" },
   );
-  if (upsertError) return redirectTo("error");
+  if (upsertError) {
+    console.error("strava-callback: falha ao gravar strava_tokens:", upsertError.message);
+    return redirectTo("error");
+  }
 
   return redirectTo("connected");
 });

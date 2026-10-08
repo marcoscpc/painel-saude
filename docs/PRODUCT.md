@@ -188,3 +188,10 @@ Como projeto pessoal, sucesso aqui significa:
 ---
 
 *Documento de produto elaborado antes da primeira linha de código do Painel-Saúde, como ponto de partida da Fase D do plano descrito em `app-forja/docs/PRODUCT.md` §12. Atualizado em 03/08/2026 a partir do estado real do código-fonte (`src/App.jsx`) e do histórico de commits do repositório `painel-saude`, já com a Fase D implantada em produção.*
+
+
+## Qualidade e processo (v0.2.0)
+- Testes (Vitest) para datas (4 fusos), classificação de pressão e agregação semanal; typecheck (`checkJs` em `src/lib`); CI e Dependabot no GitHub; regras do projeto em `CLAUDE.md`.
+- Edge Functions Strava passaram a registrar falhas no log do servidor (antes, callback falhava em silêncio e o sync devolvia `error.message` ao chamador).
+- `supabase/sql/2026-10-08_grants_explicitos.sql`: grants explícitos de `activities` (leitura para `authenticated`) e `strava_tokens` (somente `service_role`). Rodar no SQL Editor.
+- Limitação: as tabelas `bp_readings`, `body_weight`, `body_measurements` etc. pertencem ao Forja/registro-pa; o schema delas não está neste repositório.
