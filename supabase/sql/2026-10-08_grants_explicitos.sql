@@ -10,3 +10,8 @@ grant select, insert, update, delete on public.activities to service_role;
 -- strava_tokens: segredo OAuth. Sem NENHUM grant para authenticated/anon de
 -- propósito (RLS ligada e zero policies); só a service_role acessa.
 grant select, insert, update, delete on public.strava_tokens to service_role;
+
+-- Aplicado em produção em 08/10/2026: o app só lê `activities`; escrita é da
+-- Edge Function (service_role). Remove os privilégios de escrita que o
+-- Supabase concedia por padrão ao `authenticated`.
+revoke insert, update, delete on public.activities from authenticated;
