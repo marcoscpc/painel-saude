@@ -16,8 +16,13 @@ grep antes de todo push.
   (no `.gitignore`). Chave paga/secreta de terceiro (Strava etc.) é sempre
   secret de Edge Function (`Deno.env.get`), nunca `VITE_*`.
 - **Deploy**: Vercel, automático a cada push em `main`. Variável `VITE_*` nova
-  precisa ser adicionada à mão no Vercel — avisar o usuário. Não há autorização
-  permanente para mergear em `main`: abrir PR e confirmar.
+  precisa ser adicionada à mão no Vercel — avisar o usuário.
+  **Autorização permanente para mergear em `main`** (dada pelo usuário em
+  08/10/2026): ele não é de engenharia e delega a gestão de branch/PR. Depois
+  de implementar numa branch `claude/*`, abrir PR, esperar o CI ficar verde e
+  mergear sem perguntar; avisar o usuário ao final, em linguagem simples, e
+  lembrar de qualquer passo manual (variável no Vercel, SQL no Supabase,
+  redeploy de Edge Function).
 - **Validar antes de empurrar**: `npm run lint && npm run typecheck && npm test
   && npm run build`. As mesmas quatro rodam no GitHub Actions
   (`.github/workflows/ci.yml`) em todo push e PR. Dependabot avisa semanalmente
