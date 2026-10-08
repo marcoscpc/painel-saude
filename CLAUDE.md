@@ -49,3 +49,26 @@ grep antes de todo push.
   registro-pa); agregação semanal em `src/lib/aggregations.js`; sessão em
   `src/lib/auth.js`. Antes de criar um helper, `grep` por algo equivalente.
   Componente passando de ~600-700 linhas: extrair na mesma tarefa.
+
+- **Disseminar toda boa prática nova para os apps irmãos** (regra do usuário,
+  08/10/2026): os apps do Marcos compartilham as mesmas práticas e **nenhuma
+  melhoria fica só em um app**. Apps irmãos (repositórios `marcoscpc/…`):
+  `roteiro` (Bora Viajar, o mais completo — referência), `App-Forja`,
+  `registro-pa`, `painel-saude` (público: cuidado extra com segredos) e
+  `bora-dividir`. Sempre que, numa tarefa, nascer ou mudar uma prática
+  (regra no `CLAUDE.md`, ferramenta de qualidade/CI/teste, padrão de segurança,
+  achado de varredura que virou regra), **na mesma sessão**:
+  1. Avaliar se se aplica a cada irmão (ex.: regra de Edge Function só vale
+     onde há Edge Function; teste de componente só onde há React).
+  2. Aplicar nos que se aplicam (adaptando ao que cada app tem), numa branch
+     `claude/*` por app, com PR e CI verde, e mergear conforme a autorização
+     permanente de cada `CLAUDE.md`. Para repositórios que a sessão ainda não
+     tem, usar `list_repos` + `add_repo`.
+  3. Registrar a prática em `docs/BOAS-PRATICAS.md` do `roteiro` (tabela
+     "prática × app", com o status de cada um) — é a fonte única de consulta.
+  4. Ao fim, dizer ao usuário em linguagem simples onde foi aplicado e onde
+     não se aplica (e por quê). Se não der para propagar na sessão, listar a
+     pendência explicitamente em vez de deixar passar.
+  **No início de toda sessão de trabalho**, conferir rapidamente o
+  `docs/BOAS-PRATICAS.md` do `roteiro` contra este app e avisar se houver
+  lacuna aberta.
