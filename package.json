@@ -1,7 +1,7 @@
 {
   "name": "painel-saude",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "oxlint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "build:analyze": "vite build --mode analyze"
   },
   "dependencies": {
     "@supabase/auth-js": "^2.116.0",
@@ -21,6 +22,7 @@
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
     "oxlint": "^1.79.0",
+    "rollup-plugin-visualizer": "^7.1.1",
     "terser": "^5.51.2",
     "typescript": "^7.0.2",
     "vite": "^5.4.8",

@@ -86,6 +86,9 @@ export const watchSession = (onChange) => {
       window.history.replaceState(null, "", window.location.pathname);
     }
     onChange(session && authExpiryValid() ? session : null);
+  }).catch(() => {
+    // Sem isto, falha ao ler a sessão deixava o app em "Carregando…" para sempre.
+    onChange(null);
   });
 
   const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {

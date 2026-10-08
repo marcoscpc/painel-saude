@@ -195,3 +195,8 @@ Como projeto pessoal, sucesso aqui significa:
 - Edge Functions Strava passaram a registrar falhas no log do servidor (antes, callback falhava em silêncio e o sync devolvia `error.message` ao chamador).
 - `supabase/sql/2026-10-08_grants_explicitos.sql`: grants explícitos de `activities` (leitura para `authenticated`) e `strava_tokens` (somente `service_role`). Rodar no SQL Editor.
 - Limitação: as tabelas `bp_readings`, `body_weight`, `body_measurements` etc. pertencem ao Forja/registro-pa; o schema delas não está neste repositório.
+
+## Qualidade e processo (v0.2.1)
+- Falha ao ler a sessão passa a levar à tela de login (antes: "Carregando…" eterno); erro de carga do painel ganha o botão "Tentar de novo".
+- `npm run build:analyze` gera `stats.html` (treemap do bundle); só ativo nesse modo.
+- Registro de correções em `docs/HISTORICO.md`.

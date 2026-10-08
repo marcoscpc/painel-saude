@@ -20,6 +20,7 @@ export default function Dashboard({ session, stravaFlash }) {
   const [tab, setTab] = useState(stravaFlash ? "atalhos" : "painel");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const [bp, setBp] = useState([]);
   const [bw, setBw] = useState([]);
   const [meas, setMeas] = useState([]);
@@ -49,7 +50,7 @@ export default function Dashboard({ session, stravaFlash }) {
       setErr(failed ? failed.reason?.message || "Erro ao carregar dados" : null);
     }).finally(() => alive && setLoading(false));
     return () => { alive = false; };
-  }, [from, to]);
+  }, [from, to, reloadTick]);
 
   return (
     <>
@@ -68,7 +69,7 @@ export default function Dashboard({ session, stravaFlash }) {
         </div>
 
         {tab === "painel" && (
-          <PainelTab from={from} to={to} setFrom={setFrom} setTo={setTo} loading={loading} err={err}
+          <PainelTab from={from} to={to} setFrom={setFrom} setTo={setTo} loading={loading} err={err} onRetry={() => setReloadTick((n) => n + 1)}
             bp={bp} bw={bw} workouts={workouts} activities={activities} />
         )}
         {tab === "relatorios" && (
