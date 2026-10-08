@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Dependências do app (react, @supabase/supabase-js, lucide-react etc.) e
+  # de desenvolvimento (vite, vitest, eslint, typescript). Abre um PR sozinho
+  # quando alguma tem atualização de segurança ou versão nova — não aplica
+  # nada sozinho, só avisa.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # O próprio workflow de CI (ci.yml) usa actions de terceiro (checkout,
+  # setup-node) — mesma lógica: aviso automático quando alguma tem versão
+  # nova, nunca aplicado sozinho.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

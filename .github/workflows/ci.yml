@@ -1,0 +1,25 @@
+name: CI
+
+# Roda em todo push (qualquer branch) e em pull request — rede de segurança
+# automática pras mesmas checagens já documentadas no README (lint, testes,
+# checagem de tipos e build): não some se alguém (inclusive uma sessão
+# futura) esquecer de rodar isso à mão antes de empurrar. Não interfere no
+# deploy automático do Vercel, que continua no push pra `main` por fora.
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

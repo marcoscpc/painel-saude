@@ -5,7 +5,7 @@ export function isoOf(d) {
 }
 export const isoDaysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return isoOf(d); };
 export const toLocalDate = (iso) => { const [y, m, d] = iso.split("-").map(Number); return new Date(y, m - 1, d); };
-export const daysBetween = (fromIso, toIso) => Math.round((toLocalDate(toIso) - toLocalDate(fromIso)) / 864e5);
+export const daysBetween = (fromIso, toIso) => Math.round((toLocalDate(toIso).getTime() - toLocalDate(fromIso).getTime()) / 864e5);
 export const fmtBR = (iso) => { const [, m, d] = iso.split("-"); return `${d}/${m}`; };
 export const fmtBRFull = (iso) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
 export const fmtHora = (ts) => new Date(ts).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -26,7 +26,7 @@ export const fmtHoursMin = (secs) => {
 export function buildWeeks(fromISO, toISO) {
   const to = new Date(toISO + "T00:00:00");
   const from = new Date(fromISO + "T00:00:00");
-  const totalDays = Math.max(1, Math.round((to - from) / 864e5) + 1);
+  const totalDays = Math.max(1, Math.round((to.getTime() - from.getTime()) / 864e5) + 1);
   const n = Math.max(2, Math.ceil(totalDays / 7));
   const weeks = [];
   for (let i = n - 1; i >= 0; i--) {

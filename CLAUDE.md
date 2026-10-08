@@ -1,0 +1,46 @@
+# Instruções de projeto — painel-saude
+
+Convenções trazidas do Bora Viajar e do Forja (projetos irmãos), adaptadas ao
+que este app tem: painel **somente leitura** (React + Vite + Supabase) sobre os
+dados do Forja e do registro-pa, mais a integração Strava (3 Edge Functions).
+
+**Este repositório é público**: nada de URL de projeto com chave, token, segredo
+ou dado pessoal de saúde em código, exemplos, testes ou histórico. Conferir com
+grep antes de todo push.
+
+- **PRD em `docs/PRODUCT.md`**: toda correção ou melhoria atualiza a seção
+  relevante (comportamento atual) e o histórico no fim. Não pular em mudança pequena.
+- **Toda correção ou melhoria sobe a versão em `package.json`** (semver: `patch`
+  correção, `minor` funcionalidade nova, `major` só se combinado).
+- **Nunca commitar segredos.** `.env.local` é o único lugar para chaves reais
+  (no `.gitignore`). Chave paga/secreta de terceiro (Strava etc.) é sempre
+  secret de Edge Function (`Deno.env.get`), nunca `VITE_*`.
+- **Deploy**: Vercel, automático a cada push em `main`. Variável `VITE_*` nova
+  precisa ser adicionada à mão no Vercel — avisar o usuário. Não há autorização
+  permanente para mergear em `main`: abrir PR e confirmar.
+- **Validar antes de empurrar**: `npm run lint && npm run typecheck && npm test
+  && npm run build`. As mesmas quatro rodam no GitHub Actions
+  (`.github/workflows/ci.yml`) em todo push e PR. Dependabot avisa semanalmente
+  (PR próprio, nada aplicado sozinho).
+- **Testes** (Vitest): regra de negócio em `src/lib/` ganha teste `*.test.js` ao
+  lado. Função de data roda em 4 fusos (`describe.each` com `process.env.TZ`, ver
+  `dates.test.js`). Data "YYYY-MM-DD" sempre via `isoOf`/`todayStr` de
+  `src/lib/dates.js`, **nunca** `toISOString().slice(0, 10)`.
+- **TypeScript em modo checagem** (`npm run typecheck`): `checkJs` só em
+  `src/lib/**/*.js`; baseline zerado; ambiguidade vira JSDoc, nunca `@ts-ignore`.
+- **Banco**: RLS sempre ligada. **Toda tabela nova precisa de `grant` explícito**
+  na mesma migration em `supabase/sql/` (`authenticated` só se o cliente acessa
+  direto; `service_role` sempre) — senão "permission denied" a partir de
+  30/out/2026. Tabela com segredo não recebe grant para o cliente.
+- **Edge Functions**: erro nunca devolve `String(err)`/`error.message` ao cliente;
+  `console.error` do detalhe no servidor e mensagem curta em português na
+  resposta. Função que recebe URL do corpo da requisição valida o domínio antes
+  do `fetch` (SSRF). Cada função é deployada isolada (colada no editor do
+  Supabase), por isso o código de `state` fica duplicado de propósito.
+- **Tela com carregamento assíncrono**: `try/catch` + estado de erro com "Tentar
+  de novo"; nunca `loading` preso em `true`.
+- **Padrões — não reinventar**: datas e formatação em `src/lib/dates.js`;
+  classificação de pressão em `src/lib/bloodPressure.js` (mesma regra do
+  registro-pa); agregação semanal em `src/lib/aggregations.js`; sessão em
+  `src/lib/auth.js`. Antes de criar um helper, `grep` por algo equivalente.
+  Componente passando de ~600-700 linhas: extrair na mesma tarefa.

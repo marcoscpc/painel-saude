@@ -134,17 +134,21 @@ Deno.serve(async (req) => {
   const admin = createClient(supabaseUrl, serviceRoleKey);
   const { data: tokens, error } = await admin.from("strava_tokens").select("user_id");
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    // Detalhe técnico só no log do servidor; a resposta fica genérica.
+    console.error("strava-sync: falha ao ler strava_tokens:", error.message);
+    return new Response(JSON.stringify({ error: "Falha ao ler as conexões do Strava." }), { status: 500, headers: { "Content-Type": "application/json" } });
   }
 
   const results = [];
   for (const t of tokens ?? []) {
     const accessToken = await getValidAccessToken(admin, t.user_id as string, clientId, clientSecret);
     if (!accessToken) {
+      console.error("strava-sync: sem token válido para o usuário", t.user_id);
       results.push({ user_id: t.user_id, error: "sem token válido" });
       continue;
     }
     const r = await syncUser(admin, t.user_id as string, accessToken);
+    if ("error" in r) console.error("strava-sync: falha ao sincronizar o usuário", t.user_id, r.error);
     results.push({ user_id: t.user_id, ...r });
   }
 
