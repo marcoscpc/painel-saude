@@ -193,6 +193,7 @@ Como projeto pessoal, sucesso aqui significa:
 ## Qualidade e processo (v0.2.0)
 - Testes (Vitest) para datas (4 fusos), classificação de pressão e agregação semanal; typecheck (`checkJs` em `src/lib`); CI e Dependabot no GitHub; regras do projeto em `CLAUDE.md`.
 - Edge Functions Strava passaram a registrar falhas no log do servidor (antes, callback falhava em silêncio e o sync devolvia `error.message` ao chamador).
+- `strava-sync` e `strava-callback` têm `try/catch` global (`strava-sync` também por usuário): falha inesperada vai para o log do servidor e a resposta é genérica; o retorno do sync nunca traz texto técnico do banco ou do Strava (v0.2.3).
 - `supabase/sql/2026-10-08_grants_explicitos.sql`: grants explícitos de `activities` (leitura para `authenticated`) e `strava_tokens` (somente `service_role`). Rodar no SQL Editor.
 - Limitação: as tabelas `bp_readings`, `body_weight`, `body_measurements` etc. pertencem ao Forja/registro-pa; o schema delas não está neste repositório.
 
