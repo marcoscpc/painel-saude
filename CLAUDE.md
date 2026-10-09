@@ -49,6 +49,11 @@ grep antes de todo push.
   registro-pa); agregação semanal em `src/lib/aggregations.js`; sessão em
   `src/lib/auth.js`. Antes de criar um helper, `grep` por algo equivalente.
   Componente passando de ~600-700 linhas: extrair na mesma tarefa.
+  - **Valor ausente na tela** (pulso, peso, distância, temperatura — qualquer
+    campo opcional ou que pode vir `null` do banco/API): nunca interpolar direto
+    no texto nem `Math.round(x)`/`Number(x)`/`|| 0` — vira "null" ou um "0"
+    plausível e falso. Usar um helper que omita o trecho ou mostre "—" (ex.:
+    `pulseSuffix` em `src/lib/bloodPressure.js`); zero legítimo continua aparecendo.
 
 - **Disseminar toda boa prática nova para os apps irmãos** (regra do usuário,
   08/10/2026): os apps do Marcos compartilham as mesmas práticas e **nenhuma

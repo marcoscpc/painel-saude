@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { fmtBR, fmtBRFull, fmtHora, fmtSecs, fmtHoursMin, daysBetween, todayStr } from "../lib/dates";
-import { cSys, cDia, classify } from "../lib/bloodPressure";
+import { cSys, cDia, classify, pulseSuffix } from "../lib/bloodPressure";
 
 const MEAS_FIELDS = [
   ["quadril", "Quadril"], ["cintura", "Cintura"], ["busto", "Busto"],
@@ -137,7 +137,7 @@ export default function RelatoriosTab({ defaultFrom, defaultTo, bp, bw, meas, wo
     const fmtPeriodAvg = (arr) => (arr.length ? `${avgOf(arr, "sys").toFixed(0)}/${avgOf(arr, "dia").toFixed(0)} mmHg (${arr.length})` : "sem medições");
     const fmtReading = (e) => {
       const ctx = e.ctx && e.ctx.length ? ` (${e.ctx.join(", ")})` : "";
-      return `${fmtBR(e.ts.slice(0, 10))} ${fmtHora(e.ts)} — ${e.sys}/${e.dia} mmHg, pulso ${e.pul} — ${classify(e.sys, e.dia)}${ctx}`;
+      return `${fmtBR(e.ts.slice(0, 10))} ${fmtHora(e.ts)} — ${e.sys}/${e.dia} mmHg${pulseSuffix(e.pul)} — ${classify(e.sys, e.dia)}${ctx}`;
     };
 
     const lines = [`Relatório de cardiologia — ${fmtBRFull(from)} a ${fmtBRFull(to)}`, ""];
