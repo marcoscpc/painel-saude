@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classify } from "./bloodPressure";
+import { classify, pulseSuffix } from "./bloodPressure";
 
 describe("classify (mesma regra do registro-pa)", () => {
   it.each([
@@ -18,5 +18,15 @@ describe("classify (mesma regra do registro-pa)", () => {
 
   it("vale a pior categoria entre sistólica e diastólica", () => {
     expect(classify(185, 60)).toBe("HAS estágio 3");
+  });
+});
+
+describe("pulseSuffix", () => {
+  it("omite o pulso quando não foi medido, em vez de escrever null", () => {
+    expect(pulseSuffix(null)).toBe("");
+    expect(pulseSuffix(undefined)).toBe("");
+  });
+  it("mostra o pulso medido", () => {
+    expect(pulseSuffix(72)).toBe(", pulso 72");
   });
 });
