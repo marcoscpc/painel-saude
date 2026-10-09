@@ -102,7 +102,7 @@ Observação importante: **o dado só existe aqui a partir do momento em que a s
 ### 7.3 Relatório por especialista
 
 - **Relatório para fisioterapeuta**: peso, medidas corporais e frequência/volume de treino no período escolhido.
-- **Relatório para cardiologista**: pressão arterial (com a classificação já usada no registro-pa), peso e, desde 05/08/2026, cardio do Strava (lista de corridas/caminhadas do período com distância, duração e frequência cardíaca, mais um resumo com totais e FC média/máxima).
+- **Relatório para cardiologista**: pressão arterial (com a classificação já usada no registro-pa), peso e, desde 05/08/2026, cardio do Strava (lista de corridas/caminhadas do período com distância, duração e frequência cardíaca, mais um resumo com totais e FC média/máxima). Em medições de pressão sem pulso (campo opcional no registro-pa), o trecho "pulso" é omitido da linha — nunca aparece "null".
 - Filtro de data inicial/final, com opção de compartilhar (menu nativo de compartilhamento do celular, ou cópia de texto/link) — mesmo padrão do relatório de peso e medidas já existente no Forja.
 
 ### 7.4 Atalhos
