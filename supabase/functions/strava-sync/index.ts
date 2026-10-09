@@ -86,7 +86,11 @@ async function syncUser(admin: ReturnType<typeof createClient>, userId: string, 
 
     const resp = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
     if (resp.status === 429) return { upserted, rateLimited: true };
-    if (!resp.ok) return { upserted, error: `Strava respondeu ${resp.status}` };
+    if (!resp.ok) {
+      // Detalhe técnico só no log do servidor; o retorno fica curto e genérico.
+      console.error("strava-sync: Strava respondeu status", resp.status);
+      return { upserted, error: "Strava indisponível" };
+    }
 
     const items = await resp.json();
     if (!Array.isArray(items) || items.length === 0) break;
@@ -107,7 +111,10 @@ async function syncUser(admin: ReturnType<typeof createClient>, userId: string, 
 
     if (rows.length) {
       const { error: upsertError } = await admin.from("activities").upsert(rows, { onConflict: "user_id,strava_activity_id" });
-      if (upsertError) return { upserted, error: upsertError.message };
+      if (upsertError) {
+        console.error("strava-sync: falha ao gravar activities:", upsertError.message);
+        return { upserted, error: "falha ao gravar atividades" };
+      }
       upserted += rows.length;
     }
 
@@ -118,7 +125,7 @@ async function syncUser(admin: ReturnType<typeof createClient>, userId: string, 
   return { upserted };
 }
 
-Deno.serve(async (req) => {
+async function handle(req: Request): Promise<Response> {
   if (!callerIsServiceRole(req)) {
     return new Response(JSON.stringify({ error: "Não autorizado" }), { status: 401, headers: { "Content-Type": "application/json" } });
   }
@@ -141,16 +148,32 @@ Deno.serve(async (req) => {
 
   const results = [];
   for (const t of tokens ?? []) {
-    const accessToken = await getValidAccessToken(admin, t.user_id as string, clientId, clientSecret);
-    if (!accessToken) {
-      console.error("strava-sync: sem token válido para o usuário", t.user_id);
-      results.push({ user_id: t.user_id, error: "sem token válido" });
-      continue;
+    // try/catch por usuário: uma exceção (rede, JSON inválido) não derruba a sincronização dos demais.
+    try {
+      const accessToken = await getValidAccessToken(admin, t.user_id as string, clientId, clientSecret);
+      if (!accessToken) {
+        console.error("strava-sync: sem token válido para o usuário", t.user_id);
+        results.push({ user_id: t.user_id, error: "sem token válido" });
+        continue;
+      }
+      const r = await syncUser(admin, t.user_id as string, accessToken);
+      if ("error" in r) console.error("strava-sync: falha ao sincronizar o usuário", t.user_id, r.error);
+      results.push({ user_id: t.user_id, ...r });
+    } catch (err) {
+      console.error("strava-sync: exceção ao sincronizar o usuário", t.user_id, err);
+      results.push({ user_id: t.user_id, error: "falha ao sincronizar" });
     }
-    const r = await syncUser(admin, t.user_id as string, accessToken);
-    if ("error" in r) console.error("strava-sync: falha ao sincronizar o usuário", t.user_id, r.error);
-    results.push({ user_id: t.user_id, ...r });
   }
 
   return new Response(JSON.stringify({ results }), { headers: { "Content-Type": "application/json" } });
+}
+
+Deno.serve(async (req) => {
+  try {
+    return await handle(req);
+  } catch (err) {
+    // Detalhe técnico só no log do servidor; a resposta fica genérica.
+    console.error("strava-sync: erro inesperado:", err);
+    return new Response(JSON.stringify({ error: "Falha ao sincronizar o Strava." }), { status: 500, headers: { "Content-Type": "application/json" } });
+  }
 });

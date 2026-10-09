@@ -47,7 +47,7 @@ function redirectTo(status: string) {
   });
 }
 
-Deno.serve(async (req) => {
+async function handle(req: Request): Promise<Response> {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
@@ -103,4 +103,14 @@ Deno.serve(async (req) => {
   }
 
   return redirectTo("connected");
+}
+
+Deno.serve(async (req) => {
+  try {
+    return await handle(req);
+  } catch (err) {
+    // Detalhe técnico só no log do servidor; o usuário volta ao painel com aviso genérico.
+    console.error("strava-callback: erro inesperado:", err);
+    return redirectTo("error");
+  }
 });
