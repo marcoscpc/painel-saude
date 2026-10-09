@@ -55,6 +55,10 @@ grep antes de todo push.
     plausível e falso. Usar um helper que omita o trecho ou mostre "—" (ex.:
     `pulseSuffix` em `src/lib/bloodPressure.js`); zero legítimo continua aparecendo.
 
+- **Revisor de qualidade** (`.claude/agents/revisor-qualidade.md`, somente
+  leitura): antes de mergear, pedir a revisão do diff contra as regras deste
+  arquivo. As regras continuam só aqui; o agente aponta pra elas, não as copia.
+
 - **Disseminar toda boa prática nova para os apps irmãos** (regra do usuário,
   08/10/2026): os apps do Marcos compartilham as mesmas práticas e **nenhuma
   melhoria fica só em um app**. Apps irmãos (repositórios `marcoscpc/…`):
