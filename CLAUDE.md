@@ -56,8 +56,19 @@ grep antes de todo push.
     `pulseSuffix` em `src/lib/bloodPressure.js`); zero legítimo continua aparecendo.
 
 - **Revisor de qualidade** (`.claude/agents/revisor-qualidade.md`, somente
-  leitura): antes de mergear, pedir a revisão do diff contra as regras deste
-  arquivo. As regras continuam só aqui; o agente aponta pra elas, não as copia.
+  leitura): obrigatório antes de todo merge — rodar o agente sobre o diff,
+  tratar o que ele apontar (ou dizer por que não) e citar o resultado ao
+  usuário. As regras continuam só aqui; o agente aponta pra elas, não as copia.
+  **Trava automática** (`.claude/settings.json` + `.claude/hooks/`): um hook
+  nega `mcp__github__merge_pull_request` e `git push` na `main` se o revisor
+  não rodou na sessão na última hora (`registrar-revisor.sh` anota a
+  execução, `exigir-revisor.sh` confere). Se a trava negar, rode o revisor e
+  repita; não tente contornar o hook. Quem desliga é o usuário, em `/hooks`.
+  **Limite conhecido**: o hook só é carregado quando este repositório é o
+  principal da sessão — numa sessão com outro repositório como principal e
+  este anexado via `add_repo` (ex.: trabalho entre os apps irmãos), nem o
+  hook nem o agente ficam disponíveis; a revisão então precisa ser feita à
+  mão, lendo o diff contra este checklist antes de mergear.
 
 - **Disseminar toda boa prática nova para os apps irmãos** (regra do usuário,
   08/10/2026): os apps do Marcos compartilham as mesmas práticas e **nenhuma
