@@ -13,7 +13,7 @@
     "build:analyze": "vite build --mode analyze"
   },
   "dependencies": {
-    "@supabase/auth-js": "^2.116.0",
+    "@supabase/auth-js": "^2.117.2",
     "@supabase/functions-js": "^2.116.0",
     "@supabase/postgrest-js": "^2.116.0",
     "react": "^18.3.1",
